@@ -1,76 +1,90 @@
-# CLAUDE.md — Recall: spaced-repetition DSA notes
+# CLAUDE.md — Evergreen: spaced-repetition learning
 
-This repo is a personal spaced-repetition learning system ("Evergreen"), published via
-GitHub Pages. It has a **landing page**, a **concepts catalog**, a **1·4·7 tracker**, and
-a **markdown reader**, all sharing one concept list and one dark theme. Concept content is
-written elsewhere (in long Socratic sessions) and pasted in as `concepts/*.md` files; your
-job in this repo is scaffolding, wiring, git, and deployment — **not** authoring the
-derivations. When a new concept file appears, register it and push.
+A personal spaced-repetition learning app ("Evergreen"). **Split architecture:**
 
-## Layout
+- **Frontend** — static, on **GitHub Pages** (`NavaUchiha/evergreen`, this repo). Dark themed.
+- **Backend** — Node + Express + **SQLite**, on an **OCI** instance, behind **Caddy** (HTTPS).
+  Concepts, tags, comments, and 1·4·7 review tracking all persist server-side.
+
+The frontend fetches everything from the API — there is no localStorage of content anymore.
+
+## Frontend layout (repo root, served by Pages)
 
 ```
-index.html            # landing page (dark) — intro + entry points
-tracker.html          # the 1·4·7 tracker (standalone, localStorage, offline)
-concepts.html         # catalog: lists every concept, links into the reader
-reader.html           # markdown viewer — reader.html?c=<slug> renders concepts/<slug>.md
-concepts/<slug>.md     # one verbose page per concept (raw Markdown)
-concepts/_template.md  # the format every concept page follows
-assets/concepts.js     # SINGLE SOURCE OF TRUTH: window.CONCEPTS = [{title,slug,note}]
+index.html            # landing page (warm, human copy)
+concepts.html         # catalog — fetches /api/concepts, tag filter, links to reader/editor
+reader.html           # one concept — renders body, tags, 1·4·7 controls, comments
+editor.html           # write/edit a concept — live Markdown preview, needs write token
+tracker.html          # the 1·4·7 review board — due/upcoming/mastered, review via API
+assets/api.js          # API client (base URL + bearer-token helpers) — used by every page
 assets/theme.css       # shared dark theme
 assets/marked.min.js   # vendored Markdown renderer (pinned, offline)
-CLAUDE.md              # this file
-add-concept.sh         # helper: registers a concept in assets/concepts.js + commits
+import-concept.sh      # CLI: POST a local .md file into the backend
+concepts/*.md          # ARCHIVE ONLY — original source files; app no longer reads these
 ```
 
-All four pages read `assets/concepts.js`. Slugs are **bare** (`max-subarray`); pages derive
-their own paths (`reader.html?c=<slug>` to view, `concepts/<slug>.md` to fetch).
+**API base:** `https://140.245.228.37.sslip.io/api` (set in `assets/api.js`).
+`sslip.io` gives the OCI IP a DNS name so Caddy can hold a Let's Encrypt cert (no domain bought).
 
-## The 1·4·7 spaced-repetition rule
+## Backend (`server/`, deployed to the OCI box, NOT to Pages)
 
-A concept is reviewed **1, 4, and 7 days** after it's marked done (day-0 = the day it's added).
-- Add → due on day+1, then day+4, then day+7 → then "mastered".
-- "Forgot" re-anchors day-0 to today and restarts the 1·4·7 ladder.
-- The schedule lives entirely in the tracker's `localStorage`; the repo only stores the
-  seed list of concepts (title, slug, created-date, stage) so a fresh device starts populated.
+```
+server/server.js            # Express app — routes + CORS + bearer auth
+server/db.js                # SQLite schema + data access (better-sqlite3)
+server/package.json         # deps: express, cors, better-sqlite3
+server/Caddyfile            # reverse proxy + auto-HTTPS for 140.245.228.37.sslip.io
+server/evergreen-api.service# systemd unit (User=ubuntu, EnvironmentFile=.env)
+```
 
-## Concept page format (every page follows this, in order)
+Deployed to `/home/ubuntu/evergreen/` on the instance. DB at `/home/ubuntu/evergreen/data/evergreen.db`.
+Secrets live in `server/.env` on the box (never committed): `EVERGREEN_TOKEN`, `EVERGREEN_ORIGINS`.
 
-1. **Intuition + first-principles derivation** — how you'd arrive at it cold, not just the answer.
-2. **Worked example walk-through** — real numbers, traced step by step.
-3. **Multiple approaches + trade-offs** — a ladder from brute force upward, with a comparison table.
-4. **Complexity analysis (level-table style)** — sum work per level; show the table; Master
-   Theorem only as a cross-check, never as the sole justification.
-5. **Interview framing + likelihood** — odds of deriving it cold, and the exact sentence to say.
+**Access the box:** `ssh oci-test`. Service: `sudo systemctl {status,restart} evergreen-api`.
+Redeploy backend: `tar` the `server/` dir over ssh, `npm install --omit=dev`, restart the service.
 
-Tone: verbose, in-depth, but simple. Show the reasoning that *generates* the answer.
-`concepts/max-subarray.md` is the reference for length and voice — match it.
+### API surface
+```
+GET    /api/health
+GET    /api/concepts                       list (no body)
+POST   /api/concepts            [auth]      {title, slug?, note, body, tags[]}
+GET    /api/concepts/:slug                  full: body, tags, comments, reviews
+PUT    /api/concepts/:slug      [auth]      update {title, note, body, tags}
+DELETE /api/concepts/:slug      [auth]
+POST   /api/concepts/:slug/comments [auth]  {body}
+DELETE /api/comments/:id        [auth]
+POST   /api/concepts/:slug/review   [auth]  advance 1·4·7 stage
+POST   /api/concepts/:slug/forgot   [auth]  reset stage, re-anchor to today
+GET    /api/tags                            tags with counts
+```
+Reads are open; **writes need `Authorization: Bearer <token>`**. The token is entered once in the
+UI (token bar on editor/tracker; reader prompts) and kept in the browser's localStorage — it is
+NOT in the repo.
 
-## Adding a concept (the recurring loop)
+## The 1·4·7 rule (now server-side)
 
-When a new `concepts/<slug>.md` is added:
-1. Append an entry to `assets/concepts.js`: `{ title, slug, note }` (slug is bare, no path).
-2. Commit: `Add concept: <Title>`.
-3. Push to `main` (GitHub Pages auto-deploys).
+Reviewed **1, 4, 7 days** after day-0. `review` advances the stage; after stage 3 → **mastered**.
+`forgot` re-anchors day-0 to today and restarts. `due_at` is computed by the API from
+`anchored_at + [1,4,7][stage]`.
 
-Prefer running `./add-concept.sh <slug> "<Title>" "<one-line summary>"` which does 1–2.
-The catalog, tracker, and reader all pick it up automatically from `assets/concepts.js`.
-If the script is missing, do the steps by hand and then create the script.
+## Concept page format (voice to match when writing content)
 
-## Concept order (as learned)
+1. **Intuition + first-principles derivation** — how you'd arrive at it cold.
+2. **Worked example** — real numbers, traced step by step.
+3. **Approaches + trade-offs** — brute force upward, comparison table.
+4. **Complexity (level-table style)** — sum work per level; Master Theorem only as cross-check.
+5. **Interview framing** — odds of deriving cold, the one sentence to say.
 
-1. `max-subarray`      — Max subarray, divide & conquer (the anchored-seam idea)
-2. `sort-list`         — Sort List (LC 148), bottom-up merge sort, O(1) space
-3. `java-pass-by-value`— Pass-by-value-of-reference in Java (the dummy-head fix)
-4. `sort-lower-bound`  — Comparison-sort lower bound (why n log n — the n! guessing game)
-5. `search-2d-matrix`  — Search a 2D Matrix II (LC 240), 4 approaches, staircase derivation
-6. `recursion-tree`    — Recursion-tree complexity (flat / growing / shrinking levels)
-7. `master-theorem`    — Master Theorem as a compiled shortcut of the level-table
+Tone: verbose, in-depth, simple. `concepts/max-subarray.md` is the reference for length and voice.
+
+## Writing a concept now
+
+Use the **editor** (`editor.html`) — title, summary, tags, Markdown body with live preview, Save.
+It POSTs/PUTs to the backend and persists in SQLite. For bulk import of existing `.md` files:
+`EVERGREEN_TOKEN=… ./import-concept.sh concepts/<slug>.md "tag1,tag2"`.
 
 ## Deployment
 
-GitHub Pages, deploy from `main` / root. Repo: `NavaUchiha/evergreen`.
-Live: `https://navauchiha.github.io/evergreen/` (landing),
-`.../tracker.html`, `.../concepts.html`, `.../reader.html?c=<slug>` (a rendered page).
-Markdown pages render client-side via `reader.html` (vendored `assets/marked.min.js`) —
-concept files stay raw `.md`; do **not** convert them to HTML.
+- **Frontend:** commit + push `main` → GitHub Pages auto-deploys. Live at
+  `https://navauchiha.github.io/evergreen/`.
+- **Backend:** lives on the OCI instance (`ssh oci-test`), managed by systemd + Caddy.
+  It is only reachable while that instance is running.

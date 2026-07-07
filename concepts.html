@@ -22,34 +22,63 @@
 
   <div class="page-head">
     <h2>Concepts</h2>
-    <p id="sub">Every page, in the order learned. Click one to read it.</p>
+    <p id="sub">Everything you've written, kept safe on the server.</p>
   </div>
 
-  <div class="catalog" id="catalog"></div>
+  <div class="catalog-actions">
+    <a class="btn primary" href="editor.html">＋ Write a concept</a>
+  </div>
+
+  <div class="chiprow" id="tagfilter" style="margin-bottom:16px"></div>
+  <div class="catalog" id="catalog"><p class="empty sub" style="padding:30px">Loading…</p></div>
 </div>
 
-<script src="assets/concepts.js"></script>
+<script src="assets/api.js"></script>
+<script src="assets/marked.min.js"></script>
 <script>
   (function(){
-    const list = window.CONCEPTS || [];
     const el = document.getElementById("catalog");
     const sub = document.getElementById("sub");
+    const tf = document.getElementById("tagfilter");
+    let all = [], activeTag = null;
     function esc(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
-    if (!list.length){
-      el.innerHTML = '<div class="empty"><div class="big">🌱</div><p>No concepts yet.</p>'
-        + '<p class="sub">Add a page to concepts/ and register it with add-concept.sh.</p></div>';
-      sub.textContent = "";
-      return;
+
+    function render(){
+      const list = activeTag ? all.filter(c => (c.tags||[]).includes(activeTag)) : all;
+      if (!all.length){
+        el.innerHTML = '<div class="empty"><div class="big">🌱</div><p>No concepts yet.</p>'
+          + '<p class="sub">Write your first one — it saves to the server.</p></div>';
+        return;
+      }
+      sub.textContent = all.length + " concept" + (all.length===1?"":"s") + ", kept safe on the server.";
+      el.innerHTML = list.map((c,i)=>{
+        const n = String(i+1).padStart(2,"0");
+        const tags = (c.tags||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join("");
+        const badge = c.mastered ? '<span class="tag">✓ mastered</span>' : '';
+        return '<a class="concept-row" href="reader.html?c='+encodeURIComponent(c.slug)+'">'
+          + '<span class="idx">'+n+'</span>'
+          + '<span class="body"><h3>'+esc(c.title)+'</h3>'
+          + (c.note?'<p class="note">'+esc(c.note)+'</p>':'')
+          + (tags?'<span class="chiprow">'+tags+'</span>':'')+'</span>'
+          + badge
+          + '<a class="edit" href="editor.html?c='+encodeURIComponent(c.slug)+'" onclick="event.stopPropagation()">edit</a>'
+          + '<span class="arr">→</span></a>';
+      }).join("");
     }
-    sub.textContent = list.length + " concept" + (list.length===1?"":"s") + ", in the order learned. Click one to read it.";
-    el.innerHTML = list.map((c,i)=>{
-      const n = String(i+1).padStart(2,"0");
-      return '<a class="concept-row" href="reader.html?c='+encodeURIComponent(c.slug)+'">'
-        + '<span class="idx">'+n+'</span>'
-        + '<span class="body"><h3>'+esc(c.title)+'</h3>'
-        + (c.note?'<p class="note">'+esc(c.note)+'</p>':'')+'</span>'
-        + '<span class="arr">→</span></a>';
-    }).join("");
+    function renderTags(tags){
+      if(!tags.length){ tf.innerHTML=""; return; }
+      tf.innerHTML = '<span class="chip'+(activeTag?"":" on")+'" data-tag="">all</span>'
+        + tags.map(t=>'<span class="chip'+(activeTag===t.name?" on":"")+'" data-tag="'+esc(t.name)+'">'
+          + esc(t.name)+' <span class="c">'+t.count+'</span></span>').join("");
+      tf.querySelectorAll(".chip").forEach(ch=>ch.addEventListener("click",()=>{
+        activeTag = ch.dataset.tag || null; renderTags(tags); render();
+      }));
+    }
+
+    Promise.all([EvergreenAPI.listConcepts(), EvergreenAPI.tags()])
+      .then(([concepts, tags])=>{ all = concepts; renderTags(tags); render(); })
+      .catch(err=>{ el.innerHTML = '<div class="empty"><div class="big">🌐</div><p>'+esc(err.message)+'</p>'
+        + '<p class="sub">The concepts server may be offline.</p></div>'; sub.textContent=""; });
   })();
 </script>
 </body>

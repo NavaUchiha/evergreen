@@ -1,0 +1,18 @@
+[Unit]
+Description=Evergreen API (Express + SQLite)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/evergreen/server
+Environment=PORT=3000
+Environment=EVERGREEN_DATA=/home/ubuntu/evergreen/data
+EnvironmentFile=/home/ubuntu/evergreen/server/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

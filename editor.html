@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0E1216">
+<title>Write — Evergreen</title>
+<link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a class="logo" href="index.html">
+      <svg class="leaf" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 8C8 10 5.9 16.2 3.8 21.7c-.3.7.3 1.3 1 1 .5-.2 1-.5 1.4-.7C12 18 15 15 17 8zM19 3c-6 1-9 4-11 9 1.5-1 3-1.5 5-2-2 1.5-3.5 3-4.5 5C14 13 18 10 19 3z"/></svg>
+      Evergreen
+    </a>
+    <span class="spacer"></span>
+    <a class="link" href="index.html">Home</a>
+    <a class="link" href="tracker.html">Tracker</a>
+    <a class="link" href="concepts.html" aria-current="page">Concepts</a>
+  </nav>
+
+  <div class="tokenbar" id="tokenbar">
+    <span class="dot"></span>
+    <span class="lbl">Write access:</span>
+    <input id="token" type="password" placeholder="paste your write token to save changes" autocomplete="off">
+    <button id="saveToken">Save token</button>
+  </div>
+
+  <div class="editor-head">
+    <h2 id="edtitle">Write a concept</h2>
+    <div class="actions">
+      <a class="btn ghost" href="concepts.html">Cancel</a>
+      <button class="btn ghost" id="delBtn" style="display:none">Delete</button>
+      <button class="btn primary" id="saveBtn">Save</button>
+    </div>
+  </div>
+
+  <div class="ed-field">
+    <label for="title">Title</label>
+    <input id="title" type="text" placeholder="e.g. Dijkstra's shortest path" maxlength="140">
+    <div class="slughint" id="slughint"></div>
+  </div>
+  <div class="ed-field">
+    <label for="note">One-line summary</label>
+    <input id="note" type="text" placeholder="the gist, in a sentence" maxlength="200">
+  </div>
+  <div class="ed-field">
+    <label for="tags">Tags <span style="text-transform:none;color:#5D6B78">(comma-separated)</span></label>
+    <input id="tags" type="text" placeholder="graphs, greedy, interview" maxlength="200">
+  </div>
+
+  <div class="split">
+    <div class="pane">
+      <label for="body">Markdown</label>
+      <textarea id="body" placeholder="# Your concept&#10;&#10;Write it in your own words — intuition, an example, why it works…"></textarea>
+    </div>
+    <div class="pane">
+      <label>Preview</label>
+      <div class="md" id="preview" style="margin-top:0"></div>
+    </div>
+  </div>
+
+  <div class="ed-save-row">
+    <button class="btn primary" id="saveBtn2">Save concept</button>
+    <span class="saved" id="savedMsg"></span>
+    <span class="grow"></span>
+    <span class="slughint" id="status"></span>
+  </div>
+</div>
+
+<script src="assets/api.js"></script>
+<script src="assets/marked.min.js"></script>
+<script>
+(function(){
+  marked.setOptions({ gfm:true, breaks:false, headerIds:false, mangle:false });
+  const $ = (id)=>document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const editingSlug = (params.get("c")||"").replace(/[^a-z0-9-]/gi,"");
+  let existing = null;
+
+  function slugify(s){ return String(s||"").toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g,"").replace(/\s+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,""); }
+
+  // token bar
+  const tokenbar = $("tokenbar"), tokenInput = $("token");
+  function refreshToken(){ const ok = EvergreenAPI.hasToken();
+    tokenbar.classList.toggle("ok", ok);
+    tokenbar.querySelector(".lbl").textContent = ok ? "Write access: connected" : "Write access:";
+    if (ok) tokenInput.placeholder = "•••••••• (saved on this device)"; }
+  $("saveToken").addEventListener("click",()=>{ EvergreenAPI.setToken(tokenInput.value); tokenInput.value=""; refreshToken(); flash("Token saved."); });
+  refreshToken();
+
+  // live preview
+  const body = $("body"), preview = $("preview");
+  function renderPreview(){ preview.innerHTML = marked.parse(body.value || "*Nothing yet — start typing.*"); }
+  body.addEventListener("input", renderPreview);
+  $("title").addEventListener("input",()=>{ if(!editingSlug){ const s=slugify($("title").value);
+    $("slughint").textContent = s ? "url slug: "+s : ""; } });
+
+  function flash(msg,isErr){ const el=$("savedMsg"); el.textContent=msg; el.style.color=isErr?"var(--over)":"var(--done)";
+    setTimeout(()=>{ if(el.textContent===msg) el.textContent=""; }, 3000); }
+
+  async function save(){
+    const title = $("title").value.trim();
+    if(!title){ flash("Give it a title first.", true); $("title").focus(); return; }
+    if(!EvergreenAPI.hasToken()){ flash("Paste your write token up top to save.", true); tokenInput.focus(); return; }
+    const payload = {
+      title,
+      note: $("note").value.trim(),
+      body: body.value,
+      tags: $("tags").value.split(",").map(s=>s.trim()).filter(Boolean)
+    };
+    $("status").textContent = "saving…";
+    try{
+      let saved;
+      if(editingSlug){ saved = await EvergreenAPI.updateConcept(editingSlug, payload); }
+      else { saved = await EvergreenAPI.createConcept(payload); }
+      $("status").textContent = "";
+      location.href = "reader.html?c=" + encodeURIComponent(saved.slug);
+    }catch(e){ $("status").textContent=""; flash(e.message, true); }
+  }
+  $("saveBtn").addEventListener("click", save);
+  $("saveBtn2").addEventListener("click", save);
+
+  $("delBtn").addEventListener("click", async ()=>{
+    if(!editingSlug) return;
+    if(!confirm('Delete "'+ (existing?existing.title:editingSlug) +'" for good?')) return;
+    try{ await EvergreenAPI.deleteConcept(editingSlug); location.href="concepts.html"; }
+    catch(e){ flash(e.message, true); }
+  });
+
+  // load existing for edit
+  if(editingSlug){
+    $("edtitle").textContent = "Edit concept";
+    $("delBtn").style.display = "";
+    EvergreenAPI.getConcept(editingSlug).then(c=>{
+      existing = c;
+      $("title").value = c.title; $("note").value = c.note || "";
+      $("tags").value = (c.tags||[]).join(", "); body.value = c.body || "";
+      $("slughint").textContent = "url slug: " + c.slug + "  (fixed)";
+      renderPreview();
+    }).catch(e=> flash("Couldn't load: "+e.message, true));
+  } else {
+    renderPreview();
+  }
+})();
+</script>
+</body>
+</html>

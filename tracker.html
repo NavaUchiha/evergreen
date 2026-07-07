@@ -31,13 +31,11 @@
     </div>
   </header>
 
-  <div class="add">
-    <input id="title" type="text" placeholder="Concept name" autocomplete="off" maxlength="140">
-    <input id="link"  type="text" placeholder="Concept slug or URL (optional) — e.g. max-subarray" autocomplete="off" maxlength="300">
-    <div class="add-row">
-      <span class="hint">↵ to add · anchors 1·4·7 from today</span>
-      <button class="btn primary" id="addBtn" disabled>Add concept</button>
-    </div>
+  <div class="tokenbar" id="tokenbar">
+    <span class="dot"></span>
+    <span class="lbl">Write access:</span>
+    <input id="token" type="password" placeholder="paste your write token to record reviews" autocomplete="off">
+    <button id="saveToken">Save token</button>
   </div>
 
   <div class="tabs" role="tablist">
@@ -47,154 +45,98 @@
     <button class="tab" role="tab" data-filter="all" aria-selected="false">All <span class="n" id="n-all">0</span></button>
   </div>
 
-  <div class="list" id="list"></div>
-
+  <div class="list" id="list"><p class="empty sub" style="padding:30px">Loading…</p></div>
   <div class="tracker-foot" id="totalMeta"></div>
 </div>
 
-<script src="assets/concepts.js"></script>
+<script src="assets/api.js"></script>
 <script>
 (function(){
   "use strict";
-  const KEY = "evergreen_147_v1";
-  const DAY = 86400000;
-  const OFFSETS = [1,4,7];
-  const SEED = window.CONCEPTS || [];
-  let items = load();
-  let filter = "due";
+  const DAY=86400000, OFFSETS=[1,4,7];
+  const $=(id)=>document.getElementById(id);
+  let items=[], filter="due";
+  function esc(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
 
-  function load(){
-    let stored = [];
-    try { const raw = localStorage.getItem(KEY); stored = raw ? JSON.parse(raw) : []; } catch(e){ stored = []; }
-    const known = new Set(stored.map(x=>x.slug).filter(Boolean));
-    for (const s of SEED){
-      if (s.slug && !known.has(s.slug)){
-        stored.push({ id:"seed-"+s.slug, title:s.title, slug:s.slug, note:s.note||"",
-                      created:Date.now(), stage:0, log:[] });
-      }
-    }
-    return stored;
-  }
-  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(items)); }catch(e){ alert("Couldn't save — storage may be full or blocked."); } }
+  // token bar
+  const tokenbar=$("tokenbar"), tokenInput=$("token");
+  function refreshToken(){ const ok=EvergreenAPI.hasToken(); tokenbar.classList.toggle("ok",ok);
+    tokenbar.querySelector(".lbl").textContent = ok?"Write access: connected":"Write access:";
+    if(ok) tokenInput.placeholder="•••••••• (saved on this device)"; }
+  $("saveToken").addEventListener("click",()=>{ EvergreenAPI.setToken(tokenInput.value); tokenInput.value=""; refreshToken(); });
+  refreshToken();
+  function needToken(){ if(EvergreenAPI.hasToken()) return true;
+    const t=prompt("Paste your write token to record reviews:"); if(t){ EvergreenAPI.setToken(t); refreshToken(); return true; } return false; }
 
   function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
   function endOfToday(){ return startOfToday()+DAY-1; }
-  function dueDate(it){ return it.stage>=3 ? Infinity : it.created + OFFSETS[it.stage]*DAY; }
   function floorDay(ts){ const d=new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
-  function daysBetween(a,b){ return Math.round((floorDay(a)-floorDay(b))/DAY); }
-  function statusOf(it){ if(it.stage>=3) return "mastered"; const dd=dueDate(it);
-    if(dd<startOfToday()) return "overdue"; if(dd<=endOfToday()) return "due"; return "upcoming"; }
-  function relLabel(it){ if(it.stage>=3) return "mastered"; const d=daysBetween(dueDate(it),Date.now());
+  function statusOf(it){ if(it.mastered) return "mastered"; if(!it.due_at) return "upcoming";
+    if(it.due_at<startOfToday()) return "overdue"; if(it.due_at<=endOfToday()) return "due"; return "upcoming"; }
+  function relLabel(it){ if(it.mastered) return "mastered"; if(!it.due_at) return "";
+    const d=Math.round((floorDay(it.due_at)-floorDay(Date.now()))/DAY);
     if(d<0) return Math.abs(d)+"d overdue"; if(d===0) return "today"; if(d===1) return "tomorrow"; return "in "+d+"d"; }
-
-  function add(){
-    const t=title.value.trim(); if(!t) return;
-    items.unshift({ id:Date.now()+"-"+Math.random().toString(36).slice(2,7), title:t,
-      slug:link.value.trim(), note:"", created:Date.now(), stage:0, log:[] });
-    title.value=""; link.value=""; addBtn.disabled=true; save(); render(); title.focus();
-  }
-  function review(id){ const it=items.find(x=>x.id===id); if(!it) return;
-    it.log.push({at:Date.now(),stage:it.stage,action:"reviewed"}); it.stage++; save(); render(); }
-  function forgot(id){ const it=items.find(x=>x.id===id); if(!it) return;
-    it.log.push({at:Date.now(),stage:it.stage,action:"forgot"}); it.created=Date.now(); it.stage=0; save(); render(); }
-  function del(id){ const it=items.find(x=>x.id===id);
-    if(it && !confirm('Remove "'+it.title+'" from the tracker?')) return;
-    items=items.filter(x=>x.id!==id); save(); render(); }
 
   function counts(){ const c={due:0,upcoming:0,mastered:0,all:items.length};
     for(const it of items){ const s=statusOf(it);
       if(s==="due"||s==="overdue") c.due++; else if(s==="upcoming") c.upcoming++; else if(s==="mastered") c.mastered++; }
     return c; }
 
-  function trackHTML(it){
-    let h='<div class="track">';
-    for(let i=0;i<3;i++){
-      const completed=it.stage>i, active=it.stage===i&&it.stage<3;
+  function trackHTML(it){ let h='<div class="track">';
+    for(let i=0;i<3;i++){ const completed=it.stage>i, active=it.stage===i&&it.stage<3;
       const cls=completed?"dot done":active?"dot active":"dot";
       h+='<div class="step"><div class="'+cls+'" title="review '+OFFSETS[i]+' days after learning">'+OFFSETS[i]+'</div>';
-      if(i<2) h+='<div class="bar'+(it.stage>i?" done":"")+'"></div>';
-      h+='</div>';
-    }
+      if(i<2) h+='<div class="bar'+(it.stage>i?" done":"")+'"></div>'; h+='</div>'; }
     const m=it.stage>=3?"dot master done":"dot master";
-    h+='<div class="bar'+(it.stage>=3?" done":"")+'"></div><div class="'+m+'" title="mastered">✓</div></div>';
-    return h;
-  }
+    h+='<div class="bar'+(it.stage>=3?" done":"")+'"></div><div class="'+m+'" title="mastered">✓</div></div>'; return h; }
 
-  function hrefFor(slug){
-    if(!slug) return "";
-    if(/^https?:/.test(slug)) return slug;
-    const bare = slug.replace(/^concepts\//,"").replace(/\.md$/,"");
-    return "reader.html?c=" + encodeURIComponent(bare);
-  }
-  function titleHTML(it){
-    const t=esc(it.title); const href=hrefFor(it.slug);
-    return href ? '<a href="'+esc(href)+'">'+t+'</a>' : t;
-  }
-
-  function cardHTML(it){
-    const st=statusOf(it);
+  function cardHTML(it){ const st=statusOf(it);
     const badgeCls=st==="overdue"?"over":st==="due"?"due":st==="mastered"?"done":"up";
     const canReview=it.stage<3 && (st==="due"||st==="overdue");
+    const tags=(it.tags||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join("");
     let a='<div class="card-actions">';
     if(it.stage<3){
-      a+='<button class="abtn review" data-act="review" data-id="'+it.id+'"'+(canReview?"":' disabled style="opacity:.45;cursor:default"')+'>Reviewed ✓</button>';
-      a+='<button class="abtn forgot" data-act="forgot" data-id="'+it.id+'">Forgot ↺</button>';
-    } else {
-      a+='<button class="abtn forgot" data-act="forgot" data-id="'+it.id+'">Review again ↺</button>';
-    }
-    a+='<button class="abtn del" data-act="del" data-id="'+it.id+'">Remove</button></div>';
-    return '<div class="card"><div class="card-top"><div><h3>'+titleHTML(it)+'</h3>'
+      a+='<button class="abtn review" data-act="review" data-slug="'+esc(it.slug)+'"'+(canReview?"":' disabled style="opacity:.45;cursor:default"')+'>Reviewed ✓</button>';
+      a+='<button class="abtn forgot" data-act="forgot" data-slug="'+esc(it.slug)+'">Forgot ↺</button>';
+    } else { a+='<button class="abtn forgot" data-act="forgot" data-slug="'+esc(it.slug)+'">Review again ↺</button>'; }
+    a+='<a class="abtn del" style="margin-left:auto;text-decoration:none" href="reader.html?c='+encodeURIComponent(it.slug)+'">Open →</a></div>';
+    return '<div class="card"><div class="card-top"><div><h3><a href="reader.html?c='+encodeURIComponent(it.slug)+'">'+esc(it.title)+'</a></h3>'
       + (it.note?'<p class="note">'+esc(it.note)+'</p>':'')
+      + (tags?'<div class="chiprow" style="margin-top:7px">'+tags+'</div>':'')
       + '</div><span class="badge '+badgeCls+'">'+relLabel(it)+'</span></div>'
-      + trackHTML(it) + a + '</div>';
-  }
+      + trackHTML(it) + a + '</div>'; }
 
-  function emptyHTML(){
-    const map={ due:["🎯","Nothing due right now.","Add a concept, or check Upcoming."],
+  function emptyHTML(){ const map={ due:["🎯","Nothing due right now.","Add concepts, or check Upcoming."],
       upcoming:["🌊","Nothing scheduled ahead.","Reviewed concepts resurface here."],
       mastered:["🏆","Nothing mastered yet.","Clear all three reviews (1·4·7) to graduate."],
-      all:["🌱","No concepts tracked yet.","Add your first concept above."] };
+      all:["🌱","No concepts yet.","Write your first one in Concepts."] };
     const [big,p,sub]=map[filter]||map.all;
-    return '<div class="empty"><div class="big">'+big+'</div><p>'+p+'</p><p class="sub">'+sub+'</p></div>';
-  }
+    return '<div class="empty"><div class="big">'+big+'</div><p>'+p+'</p><p class="sub">'+sub+'</p></div>'; }
 
-  function render(){
-    const c=counts();
-    document.getElementById("n-due").textContent=c.due;
-    document.getElementById("n-upcoming").textContent=c.upcoming;
-    document.getElementById("n-mastered").textContent=c.mastered;
-    document.getElementById("n-all").textContent=c.all;
-    const dc=document.getElementById("dueCount"); dc.textContent=c.due; dc.className="count"+(c.due===0?" zero":"");
-    document.getElementById("totalMeta").textContent=items.length?items.length+" tracked · "+c.mastered+" mastered":"";
+  function render(){ const c=counts();
+    $("n-due").textContent=c.due; $("n-upcoming").textContent=c.upcoming; $("n-mastered").textContent=c.mastered; $("n-all").textContent=c.all;
+    const dc=$("dueCount"); dc.textContent=c.due; dc.className="count"+(c.due===0?" zero":"");
+    $("totalMeta").textContent=items.length?items.length+" tracked · "+c.mastered+" mastered":"";
     let shown=items.filter(it=>{ const s=statusOf(it);
       if(filter==="all") return true; if(filter==="due") return s==="due"||s==="overdue";
       if(filter==="upcoming") return s==="upcoming"; if(filter==="mastered") return s==="mastered"; });
-    shown.sort((a,b)=> filter==="mastered" ? b.created-a.created : dueDate(a)-dueDate(b));
-    const list=document.getElementById("list");
-    list.innerHTML = shown.length ? shown.map(cardHTML).join("") : emptyHTML();
-  }
+    shown.sort((a,b)=> filter==="mastered" ? b.updated_at-a.updated_at : (a.due_at||Infinity)-(b.due_at||Infinity));
+    $("list").innerHTML = shown.length ? shown.map(cardHTML).join("") : emptyHTML(); }
 
-  function esc(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+  async function act(slug, fn){ if(!needToken()) return;
+    try{ const updated=await fn(slug); const it=items.find(x=>x.slug===slug);
+      if(it){ Object.assign(it, updated); } render(); }
+    catch(e){ alert(e.message); } }
 
-  const title=document.getElementById("title");
-  const link=document.getElementById("link");
-  const addBtn=document.getElementById("addBtn");
-  title.addEventListener("input",()=>{ addBtn.disabled=!title.value.trim(); });
-  title.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); add(); }});
-  link.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); add(); }});
-  addBtn.addEventListener("click",add);
-
-  document.querySelectorAll(".tab").forEach(tab=>{ tab.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(tab=>tab.addEventListener("click",()=>{
     document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected","false"));
-    tab.setAttribute("aria-selected","true"); filter=tab.dataset.filter; render(); }); });
+    tab.setAttribute("aria-selected","true"); filter=tab.dataset.filter; render(); }));
+  $("list").addEventListener("click",e=>{ const btn=e.target.closest("[data-act]"); if(!btn) return;
+    const {act:a,slug}=btn.dataset;
+    if(a==="review") act(slug, EvergreenAPI.review); else if(a==="forgot") act(slug, EvergreenAPI.forgot); });
 
-  document.getElementById("list").addEventListener("click",e=>{
-    const btn=e.target.closest("[data-act]"); if(!btn) return;
-    const {act,id}=btn.dataset;
-    if(act==="review") review(id); else if(act==="forgot") forgot(id); else if(act==="del") del(id);
-  });
-
-  save(); render();
+  EvergreenAPI.listConcepts().then(list=>{ items=list; render(); })
+    .catch(err=>{ $("list").innerHTML='<div class="empty"><div class="big">🌐</div><p>'+esc(err.message)+'</p><p class="sub">The concepts server may be offline.</p></div>'; });
 })();
 </script>
 </body>

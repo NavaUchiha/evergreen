@@ -24,40 +24,78 @@
     <a class="back" href="concepts.html">← all concepts</a>
   </div>
 
+  <div class="reader-meta" id="meta"></div>
   <article class="md" id="md"><div class="loading">Loading…</div></article>
+  <section class="section" id="comments" style="display:none">
+    <h3>Comments &amp; notes</h3>
+    <div id="commentList"></div>
+    <div class="comment-add">
+      <textarea id="commentBody" placeholder="Add a note to your future self…"></textarea>
+      <button class="btn primary" id="addComment">Post</button>
+    </div>
+  </section>
 </div>
 
+<script src="assets/api.js"></script>
 <script src="assets/marked.min.js"></script>
-<script src="assets/concepts.js"></script>
 <script>
-  (function(){
-    const md = document.getElementById("md");
-    const params = new URLSearchParams(location.search);
-    const raw = params.get("c") || "";
-    // only allow safe slug characters — this becomes part of a fetch path
-    const slug = raw.replace(/[^a-z0-9-]/gi, "");
+(function(){
+  marked.setOptions({ gfm:true, breaks:false, headerIds:false, mangle:false });
+  const $ = (id)=>document.getElementById(id);
+  const md = $("md"), meta = $("meta");
+  const slug = (new URLSearchParams(location.search).get("c")||"").replace(/[^a-z0-9-]/gi,"");
+  function esc(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+  const DAY=86400000;
+  function relDue(c){ if(c.mastered) return "mastered ✓"; if(!c.due_at) return "";
+    const d=Math.round((new Date(c.due_at).setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/DAY);
+    if(d<0) return Math.abs(d)+"d overdue"; if(d===0) return "review due today"; if(d===1) return "review tomorrow"; return "review in "+d+"d"; }
 
-    if (!slug){
-      md.innerHTML = '<div class="err">No concept specified. <a href="concepts.html">Pick one →</a></div>';
-      return;
-    }
-    const meta = (window.CONCEPTS || []).find(c => c.slug === slug);
-    if (meta) document.title = meta.title + " — Evergreen";
+  function needToken(){ if(EvergreenAPI.hasToken()) return true;
+    const t=prompt("Paste your write token to make changes:"); if(t){ EvergreenAPI.setToken(t); return true; } return false; }
 
-    fetch("concepts/" + slug + ".md", {cache:"no-cache"})
-      .then(r => { if(!r.ok) throw new Error(r.status); return r.text(); })
-      .then(text => {
-        marked.setOptions({ gfm:true, breaks:false, headerIds:false, mangle:false });
-        md.innerHTML = marked.parse(text);
-        const h1 = md.querySelector("h1");
-        if (h1 && !meta) document.title = h1.textContent + " — Evergreen";
-      })
-      .catch(err => {
-        md.innerHTML = '<div class="err">Couldn’t load <code>concepts/'
-          + slug + '.md</code> (' + err.message + ').<br>'
-          + '<a href="concepts.html">Back to concepts →</a></div>';
-      });
-  })();
+  let concept=null;
+  function renderMeta(){
+    const c=concept;
+    const badgeCls = c.mastered?"done":(relDue(c).includes("overdue")?"over":relDue(c).includes("today")?"due":"up");
+    const tags=(c.tags||[]).map(t=>'<a class="chip" href="concepts.html">'+esc(t)+'</a>').join("");
+    const dots=[0,1,2].map(i=>{ const done=c.stage>i, active=c.stage===i;
+      return '<span class="dot '+(done?"done":active?"active":"")+'" title="day '+[1,4,7][i]+'" style="width:22px;height:22px;font-size:10px">'+[1,4,7][i]+'</span>'; }).join(" ");
+    meta.innerHTML = '<span class="chiprow">'+tags+'</span>'
+      + '<span class="reader-actions">'
+      + '<span class="badge '+badgeCls+'">'+esc(relDue(c))+'</span>'
+      + '<span style="display:inline-flex;gap:4px;align-items:center">'+dots+'</span>'
+      + (c.stage<3?'<button class="abtn review" id="reviewBtn">Reviewed ✓</button>':'')
+      + '<button class="abtn forgot" id="forgotBtn">'+(c.stage>=3?"Review again ↺":"Forgot ↺")+'</button>'
+      + '<a class="edit" href="editor.html?c='+encodeURIComponent(c.slug)+'">edit</a>'
+      + '</span>';
+    const rb=$("reviewBtn"); if(rb) rb.onclick=()=>act(EvergreenAPI.review);
+    $("forgotBtn").onclick=()=>act(EvergreenAPI.forgot);
+  }
+  async function act(fn){ if(!needToken()) return;
+    try{ const c=await fn(slug); concept.stage=c.stage; concept.anchored_at=c.anchored_at; concept.due_at=c.due_at; concept.mastered=c.mastered; renderMeta(); }
+    catch(e){ alert(e.message); } }
+
+  function renderComments(){
+    const list=$("commentList");
+    const cs=concept.comments||[];
+    list.innerHTML = cs.length ? cs.map(c=>'<div class="comment"><div class="body">'+esc(c.body)
+      + '<div class="when">'+new Date(c.created_at).toLocaleString()+'</div></div>'
+      + '<button class="rm" data-id="'+c.id+'" title="delete">✕</button></div>').join("")
+      : '<p class="slughint">No notes yet.</p>';
+    list.querySelectorAll(".rm").forEach(b=>b.onclick=async()=>{ if(!needToken())return;
+      try{ await EvergreenAPI.deleteComment(b.dataset.id); concept.comments=concept.comments.filter(x=>x.id!=b.dataset.id); renderComments(); }catch(e){ alert(e.message); } });
+  }
+  $("addComment").onclick=async()=>{ const t=$("commentBody").value.trim(); if(!t) return; if(!needToken()) return;
+    try{ const c=await EvergreenAPI.addComment(slug,t); concept.comments=(concept.comments||[]).concat(c); $("commentBody").value=""; renderComments(); }catch(e){ alert(e.message); } };
+
+  if(!slug){ md.innerHTML='<div class="err">No concept specified. <a href="concepts.html">Pick one →</a></div>'; return; }
+  EvergreenAPI.getConcept(slug).then(c=>{
+    concept=c; document.title=c.title+" — Evergreen";
+    renderMeta();
+    md.innerHTML = marked.parse(c.body || "*This concept has no content yet — hit edit to write it.*");
+    $("comments").style.display=""; renderComments();
+  }).catch(e=>{ md.innerHTML='<div class="err">'+esc(e.message)+'<br><a href="concepts.html">Back to concepts →</a></div>'; });
+})();
 </script>
 </body>
 </html>
