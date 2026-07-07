@@ -1,20 +1,30 @@
 # CLAUDE.md — Recall: spaced-repetition DSA notes
 
-This repo is a personal spaced-repetition learning system, published via GitHub Pages.
-It has two parts: a **tracker** (`index.html`) and **concept pages** (`concepts/*.md`).
-Concept content is written elsewhere (in long Socratic sessions) and pasted in as files;
-your job in this repo is scaffolding, wiring, git, and deployment — **not** authoring the
-derivations. When a new concept file appears, wire it in and push.
+This repo is a personal spaced-repetition learning system ("Evergreen"), published via
+GitHub Pages. It has a **landing page**, a **concepts catalog**, a **1·4·7 tracker**, and
+a **markdown reader**, all sharing one concept list and one dark theme. Concept content is
+written elsewhere (in long Socratic sessions) and pasted in as `concepts/*.md` files; your
+job in this repo is scaffolding, wiring, git, and deployment — **not** authoring the
+derivations. When a new concept file appears, register it and push.
 
 ## Layout
 
 ```
-index.html            # the 1·4·7 tracker (standalone, localStorage, offline)
-concepts/<slug>.md     # one verbose page per concept
+index.html            # landing page (dark) — intro + entry points
+tracker.html          # the 1·4·7 tracker (standalone, localStorage, offline)
+concepts.html         # catalog: lists every concept, links into the reader
+reader.html           # markdown viewer — reader.html?c=<slug> renders concepts/<slug>.md
+concepts/<slug>.md     # one verbose page per concept (raw Markdown)
 concepts/_template.md  # the format every concept page follows
+assets/concepts.js     # SINGLE SOURCE OF TRUTH: window.CONCEPTS = [{title,slug,note}]
+assets/theme.css       # shared dark theme
+assets/marked.min.js   # vendored Markdown renderer (pinned, offline)
 CLAUDE.md              # this file
-add-concept.sh         # helper: registers a new concept + commits
+add-concept.sh         # helper: registers a concept in assets/concepts.js + commits
 ```
+
+All four pages read `assets/concepts.js`. Slugs are **bare** (`max-subarray`); pages derive
+their own paths (`reader.html?c=<slug>` to view, `concepts/<slug>.md` to fetch).
 
 ## The 1·4·7 spaced-repetition rule
 
@@ -39,12 +49,12 @@ Tone: verbose, in-depth, but simple. Show the reasoning that *generates* the ans
 ## Adding a concept (the recurring loop)
 
 When a new `concepts/<slug>.md` is added:
-1. Append a card to the concept list in `index.html` (title, one-line summary, link to the page).
-2. Add a seed entry to the tracker's concept list: `{ title, slug, created: <today ISO date>, stage: 0 }`.
-3. Commit: `Add concept: <title>`.
-4. Push to `main` (GitHub Pages auto-deploys).
+1. Append an entry to `assets/concepts.js`: `{ title, slug, note }` (slug is bare, no path).
+2. Commit: `Add concept: <Title>`.
+3. Push to `main` (GitHub Pages auto-deploys).
 
-Prefer running `./add-concept.sh <slug> "<Title>" "<one-line summary>"` which does 1–3.
+Prefer running `./add-concept.sh <slug> "<Title>" "<one-line summary>"` which does 1–2.
+The catalog, tracker, and reader all pick it up automatically from `assets/concepts.js`.
 If the script is missing, do the steps by hand and then create the script.
 
 ## Concept order (as learned)
@@ -59,7 +69,8 @@ If the script is missing, do the steps by hand and then create the script.
 
 ## Deployment
 
-GitHub Pages, deploy from `main` / root. Live URL pattern:
-`https://<user>.github.io/<repo>/` (tracker) and `.../concepts/<slug>` (pages).
-Markdown pages render via a lightweight client-side renderer already wired in `concepts/`
-(or convert to `.html` on add — keep whichever the repo already uses; don't mix).
+GitHub Pages, deploy from `main` / root. Repo: `NavaUchiha/evergreen`.
+Live: `https://navauchiha.github.io/evergreen/` (landing),
+`.../tracker.html`, `.../concepts.html`, `.../reader.html?c=<slug>` (a rendered page).
+Markdown pages render client-side via `reader.html` (vendored `assets/marked.min.js`) —
+concept files stay raw `.md`; do **not** convert them to HTML.

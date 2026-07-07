@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0E1216">
+<title>Concepts — Evergreen</title>
+<link rel="stylesheet" href="assets/theme.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a class="logo" href="index.html">
+      <svg class="leaf" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 8C8 10 5.9 16.2 3.8 21.7c-.3.7.3 1.3 1 1 .5-.2 1-.5 1.4-.7C12 18 15 15 17 8zM19 3c-6 1-9 4-11 9 1.5-1 3-1.5 5-2-2 1.5-3.5 3-4.5 5C14 13 18 10 19 3z"/></svg>
+      Evergreen
+    </a>
+    <span class="spacer"></span>
+    <a class="link" href="index.html">Home</a>
+    <a class="link" href="tracker.html">Tracker</a>
+    <a class="link" href="concepts.html" aria-current="page">Concepts</a>
+  </nav>
+
+  <div class="page-head">
+    <h2>Concepts</h2>
+    <p id="sub">Every page, in the order learned. Click one to read it.</p>
+  </div>
+
+  <div class="catalog" id="catalog"></div>
+</div>
+
+<script src="assets/concepts.js"></script>
+<script>
+  (function(){
+    const list = window.CONCEPTS || [];
+    const el = document.getElementById("catalog");
+    const sub = document.getElementById("sub");
+    function esc(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+    if (!list.length){
+      el.innerHTML = '<div class="empty"><div class="big">🌱</div><p>No concepts yet.</p>'
+        + '<p class="sub">Add a page to concepts/ and register it with add-concept.sh.</p></div>';
+      sub.textContent = "";
+      return;
+    }
+    sub.textContent = list.length + " concept" + (list.length===1?"":"s") + ", in the order learned. Click one to read it.";
+    el.innerHTML = list.map((c,i)=>{
+      const n = String(i+1).padStart(2,"0");
+      return '<a class="concept-row" href="reader.html?c='+encodeURIComponent(c.slug)+'">'
+        + '<span class="idx">'+n+'</span>'
+        + '<span class="body"><h3>'+esc(c.title)+'</h3>'
+        + (c.note?'<p class="note">'+esc(c.note)+'</p>':'')+'</span>'
+        + '<span class="arr">→</span></a>';
+    }).join("");
+  })();
+</script>
+</body>
+</html>

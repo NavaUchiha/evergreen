@@ -1,29 +1,32 @@
 #!/usr/bin/env bash
 # Usage: ./add-concept.sh <slug> "<Title>" "<one-line summary>"
-# Registers a concept page in the tracker's SEED list, commits, and (optionally) pushes.
+# Registers a concept page in assets/concepts.js (the single source of truth),
+# commits, and (optionally) pushes. The landing page, catalog, and tracker all read it.
 set -euo pipefail
 
 SLUG="${1:?slug required, e.g. sort-list}"
 TITLE="${2:?title required, e.g. \"Sort List — bottom-up merge sort\"}"
 NOTE="${3:-}"
 
+LIST="assets/concepts.js"
 PAGE="concepts/${SLUG}.md"
+
 if [[ ! -f "$PAGE" ]]; then
   echo "warning: $PAGE does not exist yet — add the page file, then rerun." >&2
 fi
 
-# Insert a SEED entry just after the 'const SEED = [' line in index.html.
-ENTRY="  { title: \"${TITLE//\"/\\\"}\", slug: \"concepts/${SLUG}\", note: \"${NOTE//\"/\\\"}\" },"
-if grep -q "slug: \"concepts/${SLUG}\"" index.html; then
-  echo "already registered: concepts/${SLUG} — skipping seed insert."
+# Insert an entry just after the 'const CONCEPTS = [' line.
+ENTRY="  { title: \"${TITLE//\"/\\\"}\", slug: \"${SLUG}\", note: \"${NOTE//\"/\\\"}\" },"
+if grep -q "slug: \"${SLUG}\"" "$LIST"; then
+  echo "already registered: ${SLUG} — skipping insert."
 else
   awk -v entry="$ENTRY" '
-    /const SEED = \[/ { print; print entry; next }
+    /const CONCEPTS = \[/ { print; print entry; next }
     { print }
-  ' index.html > index.html.tmp && mv index.html.tmp index.html
-  echo "registered concepts/${SLUG} in tracker."
+  ' "$LIST" > "$LIST.tmp" && mv "$LIST.tmp" "$LIST"
+  echo "registered ${SLUG} in $LIST."
 fi
 
-git add "$PAGE" index.html 2>/dev/null || git add index.html
+git add "$PAGE" "$LIST" 2>/dev/null || git add "$LIST"
 git commit -m "Add concept: ${TITLE}"
 echo "committed. run 'git push' to deploy."
