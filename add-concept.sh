@@ -14,7 +14,7 @@ fi
 
 # Insert a SEED entry just after the 'const SEED = [' line in index.html.
 ENTRY="  { title: \"${TITLE//\"/\\\"}\", slug: \"concepts/${SLUG}\", note: \"${NOTE//\"/\\\"}\" },"
-if grep -q "concepts/${SLUG}\"" index.html; then
+if grep -q "slug: \"concepts/${SLUG}\"" index.html; then
   echo "already registered: concepts/${SLUG} — skipping seed insert."
 else
   awk -v entry="$ENTRY" '
