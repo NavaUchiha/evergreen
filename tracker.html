@@ -33,9 +33,9 @@
 
   <div class="tokenbar" id="tokenbar">
     <span class="dot"></span>
-    <span class="lbl">Write access:</span>
-    <input id="token" type="password" placeholder="paste your write token to record reviews" autocomplete="off">
-    <button id="saveToken">Save token</button>
+    <span class="lbl">Password:</span>
+    <input id="token" type="password" placeholder="enter your password to record reviews" autocomplete="current-password">
+    <button id="saveToken">Save</button>
   </div>
 
   <div class="tabs" role="tablist">
@@ -61,12 +61,12 @@
   // token bar
   const tokenbar=$("tokenbar"), tokenInput=$("token");
   function refreshToken(){ const ok=EvergreenAPI.hasToken(); tokenbar.classList.toggle("ok",ok);
-    tokenbar.querySelector(".lbl").textContent = ok?"Write access: connected":"Write access:";
+    tokenbar.querySelector(".lbl").textContent = ok?"Password: saved":"Password:";
     if(ok) tokenInput.placeholder="•••••••• (saved on this device)"; }
   $("saveToken").addEventListener("click",()=>{ EvergreenAPI.setToken(tokenInput.value); tokenInput.value=""; refreshToken(); });
   refreshToken();
   function needToken(){ if(EvergreenAPI.hasToken()) return true;
-    const t=prompt("Paste your write token to record reviews:"); if(t){ EvergreenAPI.setToken(t); refreshToken(); return true; } return false; }
+    const t=prompt("Enter your password to record reviews:"); if(t){ EvergreenAPI.setToken(t); refreshToken(); return true; } return false; }
 
   function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
   function endOfToday(){ return startOfToday()+DAY-1; }

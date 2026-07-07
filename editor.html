@@ -22,9 +22,9 @@
 
   <div class="tokenbar" id="tokenbar">
     <span class="dot"></span>
-    <span class="lbl">Write access:</span>
-    <input id="token" type="password" placeholder="paste your write token to save changes" autocomplete="off">
-    <button id="saveToken">Save token</button>
+    <span class="lbl">Password:</span>
+    <input id="token" type="password" placeholder="enter your password to save changes" autocomplete="current-password">
+    <button id="saveToken">Save</button>
   </div>
 
   <div class="editor-head">
@@ -86,9 +86,9 @@
   const tokenbar = $("tokenbar"), tokenInput = $("token");
   function refreshToken(){ const ok = EvergreenAPI.hasToken();
     tokenbar.classList.toggle("ok", ok);
-    tokenbar.querySelector(".lbl").textContent = ok ? "Write access: connected" : "Write access:";
+    tokenbar.querySelector(".lbl").textContent = ok ? "Password: saved" : "Password:";
     if (ok) tokenInput.placeholder = "•••••••• (saved on this device)"; }
-  $("saveToken").addEventListener("click",()=>{ EvergreenAPI.setToken(tokenInput.value); tokenInput.value=""; refreshToken(); flash("Token saved."); });
+  $("saveToken").addEventListener("click",()=>{ EvergreenAPI.setToken(tokenInput.value); tokenInput.value=""; refreshToken(); flash("Password saved."); });
   refreshToken();
 
   // live preview
@@ -104,7 +104,7 @@
   async function save(){
     const title = $("title").value.trim();
     if(!title){ flash("Give it a title first.", true); $("title").focus(); return; }
-    if(!EvergreenAPI.hasToken()){ flash("Paste your write token up top to save.", true); tokenInput.focus(); return; }
+    if(!EvergreenAPI.hasToken()){ flash("Enter your password up top to save.", true); tokenInput.focus(); return; }
     const payload = {
       title,
       note: $("note").value.trim(),

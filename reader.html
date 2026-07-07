@@ -51,7 +51,7 @@
     if(d<0) return Math.abs(d)+"d overdue"; if(d===0) return "review due today"; if(d===1) return "review tomorrow"; return "review in "+d+"d"; }
 
   function needToken(){ if(EvergreenAPI.hasToken()) return true;
-    const t=prompt("Paste your write token to make changes:"); if(t){ EvergreenAPI.setToken(t); return true; } return false; }
+    const t=prompt("Enter your password to make changes:"); if(t){ EvergreenAPI.setToken(t); return true; } return false; }
 
   let concept=null;
   function renderMeta(){
