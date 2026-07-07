@@ -62,10 +62,12 @@ function tagId(name) {
 }
 const clearConceptTags = db.prepare("DELETE FROM concept_tags WHERE concept_id = ?");
 const linkTag = db.prepare("INSERT OR IGNORE INTO concept_tags(concept_id, tag_id) VALUES(?, ?)");
+const pruneOrphanTags = db.prepare("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM concept_tags)");
 function setTags(conceptId, names) {
   clearConceptTags.run(conceptId);
   const clean = [...new Set((names || []).map(n => String(n).trim().toLowerCase()).filter(Boolean))];
   for (const n of clean) linkTag.run(conceptId, tagId(n));
+  pruneOrphanTags.run();
 }
 const tagsForConcept = db.prepare(
   "SELECT t.name FROM tags t JOIN concept_tags ct ON ct.tag_id = t.id WHERE ct.concept_id = ? ORDER BY t.name"
@@ -149,7 +151,7 @@ module.exports = {
     return c;
   },
   createConcept, editConcept,
-  deleteConcept: (slug) => delBySlug.run(slug).changes > 0,
+  deleteConcept: (slug) => { const n = delBySlug.run(slug).changes; if (n) pruneOrphanTags.run(); return n > 0; },
   addComment: (slug, body) => {
     const row = getBySlug.get(slug); if (!row) return null;
     const now = Date.now();
