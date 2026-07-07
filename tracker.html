@@ -65,8 +65,6 @@
     if(ok) tokenInput.placeholder="•••••••• (saved on this device)"; }
   $("saveToken").addEventListener("click",()=>{ EvergreenAPI.setToken(tokenInput.value); tokenInput.value=""; refreshToken(); });
   refreshToken();
-  function needToken(){ if(EvergreenAPI.hasToken()) return true;
-    const t=prompt("Enter your password to record reviews:"); if(t){ EvergreenAPI.setToken(t); refreshToken(); return true; } return false; }
 
   function startOfToday(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
   function endOfToday(){ return startOfToday()+DAY-1; }
@@ -123,9 +121,9 @@
     shown.sort((a,b)=> filter==="mastered" ? b.updated_at-a.updated_at : (a.due_at||Infinity)-(b.due_at||Infinity));
     $("list").innerHTML = shown.length ? shown.map(cardHTML).join("") : emptyHTML(); }
 
-  async function act(slug, fn){ if(!needToken()) return;
-    try{ const updated=await fn(slug); const it=items.find(x=>x.slug===slug);
-      if(it){ Object.assign(it, updated); } render(); }
+  async function act(slug, fn){
+    try{ const updated=await EvergreenAPI.withAuth(()=>fn(slug)); if(!updated) return;
+      const it=items.find(x=>x.slug===slug); if(it){ Object.assign(it, updated); } refreshToken(); render(); }
     catch(e){ alert(e.message); } }
 
   document.querySelectorAll(".tab").forEach(tab=>tab.addEventListener("click",()=>{

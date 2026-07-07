@@ -42,8 +42,9 @@ const wrap = (fn) => (req, res) => {
   }
 };
 
-// --- health ---
+// --- health / auth check ---
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "evergreen", writeable: !!TOKEN }));
+app.get("/api/verify", requireAuth, (_req, res) => res.json({ ok: true }));
 
 // --- concepts ---
 app.get("/api/concepts", wrap((_req, res) => res.json(store.listConcepts())));

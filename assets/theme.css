@@ -215,5 +215,26 @@ header.tracker-head{padding:2px 0 18px; display:flex; align-items:flex-end; just
 .comment-add textarea{flex:1; background:#0A0E12; border:1px solid var(--line); border-radius:9px; color:var(--ink); font-family:var(--ui); font-size:14px; padding:9px 11px; resize:vertical; min-height:44px; outline:none}
 .comment-add textarea:focus{border-color:var(--brand)}
 
-@media (prefers-reduced-motion:reduce){ .card{animation:none} .concept-row{transition:none} }
+/* ---- password modal ---- */
+.pw-overlay{position:fixed; inset:0; background:rgba(6,10,14,.66); backdrop-filter:blur(3px);
+  display:flex; align-items:center; justify-content:center; padding:20px; z-index:1000; animation:fade .15s ease both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.pw-modal{width:100%; max-width:380px; background:var(--surface); border:1px solid var(--line); border-radius:18px;
+  padding:26px 26px 22px; box-shadow:0 20px 60px rgba(0,0,0,.5); animation:pop .18s ease both; text-align:center}
+@keyframes pop{from{opacity:0; transform:translateY(8px) scale(.98)}to{opacity:1; transform:none}}
+.pw-lock{width:46px; height:46px; margin:0 auto 12px; border-radius:50%; background:var(--brand-soft);
+  display:flex; align-items:center; justify-content:center; font-size:22px}
+.pw-modal h3{margin:0 0 6px; font-size:18px; letter-spacing:-.01em}
+.pw-modal p{margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.5}
+.pw-input{width:100%; background:#0A0E12; border:1px solid var(--line); border-radius:10px; color:var(--ink);
+  font-family:var(--ui); font-size:15px; padding:11px 13px; outline:none; text-align:center; letter-spacing:.02em}
+.pw-input:focus{border-color:var(--brand)}
+.pw-err{min-height:18px; margin:8px 0 2px; font-family:var(--mono); font-size:12px; color:var(--muted)}
+.pw-err.bad{color:var(--over)}
+.pw-remember{display:flex; align-items:center; justify-content:center; gap:7px; font-size:12.5px; color:var(--muted); margin:6px 0 16px; cursor:pointer}
+.pw-remember input{accent-color:var(--brand)}
+.pw-actions{display:flex; gap:10px}
+.pw-actions .btn{flex:1; justify-content:center}
+
+@media (prefers-reduced-motion:reduce){ .card{animation:none} .concept-row{transition:none} .pw-overlay,.pw-modal{animation:none} }
 @media (max-width:560px){ .hero h1{font-size:32px} .md{padding:22px 18px} }

@@ -50,9 +50,6 @@
     const d=Math.round((new Date(c.due_at).setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/DAY);
     if(d<0) return Math.abs(d)+"d overdue"; if(d===0) return "review due today"; if(d===1) return "review tomorrow"; return "review in "+d+"d"; }
 
-  function needToken(){ if(EvergreenAPI.hasToken()) return true;
-    const t=prompt("Enter your password to make changes:"); if(t){ EvergreenAPI.setToken(t); return true; } return false; }
-
   let concept=null;
   function renderMeta(){
     const c=concept;
@@ -71,8 +68,9 @@
     const rb=$("reviewBtn"); if(rb) rb.onclick=()=>act(EvergreenAPI.review);
     $("forgotBtn").onclick=()=>act(EvergreenAPI.forgot);
   }
-  async function act(fn){ if(!needToken()) return;
-    try{ const c=await fn(slug); concept.stage=c.stage; concept.anchored_at=c.anchored_at; concept.due_at=c.due_at; concept.mastered=c.mastered; renderMeta(); }
+  async function act(fn){
+    try{ const c=await EvergreenAPI.withAuth(()=>fn(slug)); if(!c) return;
+      concept.stage=c.stage; concept.anchored_at=c.anchored_at; concept.due_at=c.due_at; concept.mastered=c.mastered; renderMeta(); }
     catch(e){ alert(e.message); } }
 
   function renderComments(){
@@ -82,11 +80,13 @@
       + '<div class="when">'+new Date(c.created_at).toLocaleString()+'</div></div>'
       + '<button class="rm" data-id="'+c.id+'" title="delete">✕</button></div>').join("")
       : '<p class="slughint">No notes yet.</p>';
-    list.querySelectorAll(".rm").forEach(b=>b.onclick=async()=>{ if(!needToken())return;
-      try{ await EvergreenAPI.deleteComment(b.dataset.id); concept.comments=concept.comments.filter(x=>x.id!=b.dataset.id); renderComments(); }catch(e){ alert(e.message); } });
+    list.querySelectorAll(".rm").forEach(b=>b.onclick=async()=>{
+      try{ const r=await EvergreenAPI.withAuth(()=>EvergreenAPI.deleteComment(b.dataset.id)); if(!r) return;
+        concept.comments=concept.comments.filter(x=>x.id!=b.dataset.id); renderComments(); }catch(e){ alert(e.message); } });
   }
-  $("addComment").onclick=async()=>{ const t=$("commentBody").value.trim(); if(!t) return; if(!needToken()) return;
-    try{ const c=await EvergreenAPI.addComment(slug,t); concept.comments=(concept.comments||[]).concat(c); $("commentBody").value=""; renderComments(); }catch(e){ alert(e.message); } };
+  $("addComment").onclick=async()=>{ const t=$("commentBody").value.trim(); if(!t) return;
+    try{ const c=await EvergreenAPI.withAuth(()=>EvergreenAPI.addComment(slug,t)); if(!c) return;
+      concept.comments=(concept.comments||[]).concat(c); $("commentBody").value=""; renderComments(); }catch(e){ alert(e.message); } };
 
   if(!slug){ md.innerHTML='<div class="err">No concept specified. <a href="concepts.html">Pick one →</a></div>'; return; }
   EvergreenAPI.getConcept(slug).then(c=>{

@@ -56,9 +56,18 @@ POST   /api/concepts/:slug/review   [auth]  advance 1·4·7 stage
 POST   /api/concepts/:slug/forgot   [auth]  reset stage, re-anchor to today
 GET    /api/tags                            tags with counts
 ```
-Reads are open; **writes need `Authorization: Bearer <token>`**. The token is entered once in the
-UI (token bar on editor/tracker; reader prompts) and kept in the browser's localStorage — it is
-NOT in the repo.
+Reads are open; **writes need `Authorization: Bearer <password>`**. The password is set in
+`server/.env` (`EVERGREEN_TOKEN`) on the box; the user enters it once via a styled modal
+(`EvergreenAPI.promptPassword`, verified against `GET /api/verify`) and it's kept in the browser
+(localStorage if "remember", else sessionStorage). It is NOT in the repo.
+
+## Backups
+
+Nightly `cron` at 02:00 UTC on the box runs `~/evergreen/backup.sh`: a consistent SQLite
+snapshot (better-sqlite3 online backup) → gzip → HTTP PUT to an **OCI Object Storage** bucket
+`evergreen-backups` via a write-only **Pre-Authenticated Request** (URL stored in
+`~/evergreen/backup.env`, the only secret; no OCI keys on the box). Restore = download the latest
+`evergreen-*.db.gz`, gunzip, replace `~/evergreen/data/evergreen.db`, restart the service.
 
 ## The 1·4·7 rule (now server-side)
 

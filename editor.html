@@ -104,7 +104,6 @@
   async function save(){
     const title = $("title").value.trim();
     if(!title){ flash("Give it a title first.", true); $("title").focus(); return; }
-    if(!EvergreenAPI.hasToken()){ flash("Enter your password up top to save.", true); tokenInput.focus(); return; }
     const payload = {
       title,
       note: $("note").value.trim(),
@@ -113,10 +112,12 @@
     };
     $("status").textContent = "saving…";
     try{
-      let saved;
-      if(editingSlug){ saved = await EvergreenAPI.updateConcept(editingSlug, payload); }
-      else { saved = await EvergreenAPI.createConcept(payload); }
+      const saved = await EvergreenAPI.withAuth(()=> editingSlug
+        ? EvergreenAPI.updateConcept(editingSlug, payload)
+        : EvergreenAPI.createConcept(payload));
       $("status").textContent = "";
+      if(!saved) return;              // password prompt cancelled
+      refreshToken();
       location.href = "reader.html?c=" + encodeURIComponent(saved.slug);
     }catch(e){ $("status").textContent=""; flash(e.message, true); }
   }
@@ -126,7 +127,7 @@
   $("delBtn").addEventListener("click", async ()=>{
     if(!editingSlug) return;
     if(!confirm('Delete "'+ (existing?existing.title:editingSlug) +'" for good?')) return;
-    try{ await EvergreenAPI.deleteConcept(editingSlug); location.href="concepts.html"; }
+    try{ const r=await EvergreenAPI.withAuth(()=>EvergreenAPI.deleteConcept(editingSlug)); if(!r) return; location.href="concepts.html"; }
     catch(e){ flash(e.message, true); }
   });
 
