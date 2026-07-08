@@ -215,6 +215,11 @@ header.tracker-head{padding:2px 0 18px; display:flex; align-items:flex-end; just
 .comment-add textarea{flex:1; background:#0A0E12; border:1px solid var(--line); border-radius:9px; color:var(--ink); font-family:var(--ui); font-size:14px; padding:9px 11px; resize:vertical; min-height:44px; outline:none}
 .comment-add textarea:focus{border-color:var(--brand)}
 
+/* ---- concept sections ---- */
+.md .sec-head{ font-size:19px; color:var(--brand-ink); border-top:1px solid var(--line-soft);
+  padding-top:22px; margin:28px 0 12px; letter-spacing:-.01em }
+.md .concept-sec:first-child .sec-head{ border-top:0; padding-top:0; margin-top:0 }
+
 /* ---- star / favorite ---- */
 .abtn.star{background:transparent; border:1px solid var(--line); color:var(--muted); font-size:15px; line-height:1; padding:6px 10px}
 .abtn.star:hover{border-color:var(--due); color:var(--due)}

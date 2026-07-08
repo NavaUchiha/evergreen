@@ -51,20 +51,11 @@
   </div>
 
   <div class="split">
-    <div class="pane">
-      <label for="body">Markdown</label>
-      <textarea id="body" placeholder="# Your concept&#10;&#10;Write it in your own words — intuition, an example, why it works…"></textarea>
-    </div>
+    <div class="pane" id="sectionEditors"></div>
     <div class="pane">
       <label>Preview</label>
       <div class="md" id="preview" style="margin-top:0"></div>
     </div>
-  </div>
-
-  <div class="ed-field" style="margin-top:16px">
-    <label for="notes">📝 My Notes <span style="text-transform:none;color:#5D6B78">— personal, renders after the body</span></label>
-    <textarea id="notes" placeholder="Your own notes: gotchas, a 60-second recap, the interview line…"
-      style="width:100%;min-height:24vh;background:#0A0E12;border:1px solid var(--line);border-radius:10px;color:#D6E0EA;font-family:var(--mono);font-size:13px;line-height:1.6;padding:14px 16px;outline:none;resize:vertical"></textarea>
   </div>
 
   <div class="ed-save-row">
@@ -76,6 +67,7 @@
 </div>
 
 <script src="assets/api.js"></script>
+<script src="assets/sections.js"></script>
 <script src="assets/marked.min.js"></script>
 <script>
 (function(){
@@ -88,6 +80,16 @@
   function slugify(s){ return String(s||"").toLowerCase().trim()
     .replace(/[^a-z0-9\s-]/g,"").replace(/\s+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,""); }
 
+  // build a labeled textarea per section
+  const box = $("sectionEditors");
+  box.innerHTML = EVERGREEN_SECTIONS.map(s =>
+    '<label style="margin-top:4px">'+s.icon+' '+s.label+'</label>'
+    + '<textarea id="sec_'+s.key+'" data-key="'+s.key+'" placeholder="'+s.hint+'" '
+    + 'style="width:100%;min-height:20vh;background:#0A0E12;border:1px solid var(--line);border-radius:10px;color:#D6E0EA;'
+    + 'font-family:var(--mono);font-size:13px;line-height:1.6;padding:14px 16px;outline:none;resize:vertical;margin-bottom:12px"></textarea>'
+  ).join("");
+  const areas = EVERGREEN_SECTIONS.map(s => $("sec_"+s.key));
+
   // token bar
   const tokenbar = $("tokenbar"), tokenInput = $("token");
   function refreshToken(){ const ok = EvergreenAPI.hasToken();
@@ -97,10 +99,12 @@
   $("saveToken").addEventListener("click",()=>{ EvergreenAPI.setToken(tokenInput.value); tokenInput.value=""; refreshToken(); flash("Password saved."); });
   refreshToken();
 
-  // live preview
-  const body = $("body"), preview = $("preview");
-  function renderPreview(){ preview.innerHTML = marked.parse(body.value || "*Nothing yet — start typing.*"); }
-  body.addEventListener("input", renderPreview);
+  // combined live preview
+  const preview = $("preview");
+  function values(){ const v={}; for(const s of EVERGREEN_SECTIONS) v[s.key]=$("sec_"+s.key).value; return v; }
+  function renderPreview(){ preview.innerHTML = EvergreenSections.renderHTML(values(), marked) || "<p class='slughint'>Nothing yet — start writing.</p>"; }
+  areas.forEach(a => a.addEventListener("input", renderPreview));
+
   $("title").addEventListener("input",()=>{ if(!editingSlug){ const s=slugify($("title").value);
     $("slughint").textContent = s ? "url slug: "+s : ""; } });
 
@@ -110,20 +114,17 @@
   async function save(){
     const title = $("title").value.trim();
     if(!title){ flash("Give it a title first.", true); $("title").focus(); return; }
-    const payload = {
-      title,
-      note: $("note").value.trim(),
-      body: body.value,
-      notes: $("notes").value,
+    const payload = Object.assign({
+      title, note: $("note").value.trim(),
       tags: $("tags").value.split(",").map(s=>s.trim()).filter(Boolean)
-    };
+    }, values());
     $("status").textContent = "saving…";
     try{
       const saved = await EvergreenAPI.withAuth(()=> editingSlug
         ? EvergreenAPI.updateConcept(editingSlug, payload)
         : EvergreenAPI.createConcept(payload));
       $("status").textContent = "";
-      if(!saved) return;              // password prompt cancelled
+      if(!saved) return;
       refreshToken();
       location.href = "reader.html?c=" + encodeURIComponent(saved.slug);
     }catch(e){ $("status").textContent=""; flash(e.message, true); }
@@ -138,14 +139,17 @@
     catch(e){ flash(e.message, true); }
   });
 
-  // load existing for edit
   if(editingSlug){
     $("edtitle").textContent = "Edit concept";
     $("delBtn").style.display = "";
     EvergreenAPI.getConcept(editingSlug).then(c=>{
       existing = c;
       $("title").value = c.title; $("note").value = c.note || "";
-      $("tags").value = (c.tags||[]).join(", "); body.value = c.body || ""; $("notes").value = c.notes || "";
+      $("tags").value = (c.tags||[]).join(", ");
+      // load sections; if empty but a legacy body exists, drop it into Rundown so nothing is lost
+      const anySection = EVERGREEN_SECTIONS.some(s => (c[s.key]||"").trim());
+      for(const s of EVERGREEN_SECTIONS) $("sec_"+s.key).value = c[s.key] || "";
+      if(!anySection && (c.body||"").trim()) $("sec_rundown").value = c.body;
       $("slughint").textContent = "url slug: " + c.slug + "  (fixed)";
       renderPreview();
     }).catch(e=> flash("Couldn't load: "+e.message, true));

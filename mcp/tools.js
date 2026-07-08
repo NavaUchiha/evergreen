@@ -30,13 +30,16 @@ export function createServer() {
       title: z.string().describe("Concept title, e.g. \"Dijkstra's shortest path\""),
       summary: z.string().optional().describe("One-line summary shown in the catalog"),
       tags: z.array(z.string()).optional().describe("Tags, e.g. [\"graphs\",\"greedy\"]"),
-      body: z.string().describe("The full concept content in Markdown"),
-      notes: z.string().optional().describe("Personal \"My Notes\" (Markdown), rendered after the body")
+      problem: z.string().optional().describe("Section: 🧩 Problem statement (Markdown)"),
+      first_instinct: z.string().optional().describe("Section: 💭 First Instinct — raw first thoughts (Markdown)"),
+      quick: z.string().optional().describe("Section: ⚡ Quick Version — 60-second recap (Markdown)"),
+      rundown: z.string().optional().describe("Section: 📓 Rundown — full walkthrough (Markdown)"),
+      body: z.string().optional().describe("Legacy single-body Markdown (prefer the section fields)")
     },
-    async ({ title, summary, tags, body, notes }) => {
+    async ({ title, summary, tags, problem, first_instinct, quick, rundown, body }) => {
       if (!TOKEN) return fail("EVERGREEN_TOKEN not configured — cannot publish.");
       try {
-        const c = await api("POST", "/concepts", { title, note: summary || "", tags: tags || [], body, notes: notes || "" }, true);
+        const c = await api("POST", "/concepts", { title, note: summary || "", tags: tags || [], problem, first_instinct, quick, rundown, body }, true);
         return ok({ id: c.slug, slug: c.slug, url: urlFor(c.slug), title: c.title, tags: c.tags });
       } catch (e) { return fail(e.message); }
     }
@@ -50,18 +53,21 @@ export function createServer() {
       title: z.string().optional().describe("New title"),
       summary: z.string().optional().describe("New one-line summary"),
       tags: z.array(z.string()).optional().describe("New full tag list (replaces existing)"),
-      body: z.string().optional().describe("New full Markdown body (replaces existing)"),
-      notes: z.string().optional().describe("New personal \"My Notes\" (Markdown, replaces existing)")
+      problem: z.string().optional().describe("Section: 🧩 Problem statement (replaces existing)"),
+      first_instinct: z.string().optional().describe("Section: 💭 First Instinct (replaces existing)"),
+      quick: z.string().optional().describe("Section: ⚡ Quick Version (replaces existing)"),
+      rundown: z.string().optional().describe("Section: 📓 Rundown (replaces existing)"),
+      body: z.string().optional().describe("Legacy single-body Markdown (replaces existing)")
     },
-    async ({ slug, title, summary, tags, body, notes }) => {
+    async ({ slug, title, summary, tags, problem, first_instinct, quick, rundown, body }) => {
       if (!TOKEN) return fail("EVERGREEN_TOKEN not configured — cannot update.");
       const payload = {};
       if (title !== undefined) payload.title = title;
       if (summary !== undefined) payload.note = summary;
       if (tags !== undefined) payload.tags = tags;
-      if (body !== undefined) payload.body = body;
-      if (notes !== undefined) payload.notes = notes;
-      if (Object.keys(payload).length === 0) return fail("Nothing to update — provide title, summary, tags, body, or notes.");
+      const sects = { problem, first_instinct, quick, rundown, body };
+      for (const k of Object.keys(sects)) if (sects[k] !== undefined) payload[k] = sects[k];
+      if (Object.keys(payload).length === 0) return fail("Nothing to update — provide a field to change.");
       try {
         const c = await api("PUT", "/concepts/" + encodeURIComponent(slug), payload, true);
         return ok({ id: c.slug, slug: c.slug, url: urlFor(c.slug), title: c.title, tags: c.tags, updated_at: c.updated_at });
@@ -113,7 +119,8 @@ export function createServer() {
         return ok({
           slug: c.slug, title: c.title, summary: c.note, tags: c.tags,
           starred: c.starred, stage: c.stage, mastered: c.mastered, due_at: c.due_at,
-          body: c.body, notes: c.notes, comments: c.comments, url: urlFor(c.slug)
+          problem: c.problem, first_instinct: c.first_instinct, quick: c.quick, rundown: c.rundown,
+          body: c.body, comments: c.comments, url: urlFor(c.slug)
         });
       } catch (e) { return fail(e.message.includes("404") ? `No concept "${slug}"` : e.message); }
     }

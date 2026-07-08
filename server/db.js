@@ -52,7 +52,10 @@ CREATE INDEX IF NOT EXISTS idx_reviews_concept ON reviews(concept_id);
 // --- migrations ---
 const cols = db.prepare("PRAGMA table_info(concepts)").all().map(c => c.name);
 if (!cols.includes("starred")) db.exec("ALTER TABLE concepts ADD COLUMN starred INTEGER NOT NULL DEFAULT 0");
-if (!cols.includes("notes")) db.exec("ALTER TABLE concepts ADD COLUMN notes TEXT NOT NULL DEFAULT ''"); // personal "My Notes" (markdown)
+// content sections (each markdown): problem statement, first instinct, quick version, rundown
+for (const c of ["problem", "first_instinct", "quick", "rundown"]) {
+  if (!cols.includes(c)) db.exec(`ALTER TABLE concepts ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
+}
 
 const DAY = 86400000;
 const OFFSETS = [1, 4, 7];
@@ -81,11 +84,13 @@ function conceptTags(id) { return tagsForConcept.all(id).map(r => r.name); }
 
 /* ---- concepts ---- */
 const insConcept = db.prepare(
-  `INSERT INTO concepts(slug,title,note,body,notes,created_at,updated_at,stage,anchored_at)
-   VALUES(@slug,@title,@note,@body,@notes,@now,@now,0,@now)`
+  `INSERT INTO concepts(slug,title,note,body,problem,first_instinct,quick,rundown,created_at,updated_at,stage,anchored_at)
+   VALUES(@slug,@title,@note,@body,@problem,@first_instinct,@quick,@rundown,@now,@now,0,@now)`
 );
 const updConcept = db.prepare(
-  `UPDATE concepts SET title=@title, note=@note, body=@body, notes=@notes, updated_at=@now WHERE slug=@slug`
+  `UPDATE concepts SET title=@title, note=@note, body=@body,
+     problem=@problem, first_instinct=@first_instinct, quick=@quick, rundown=@rundown, updated_at=@now
+   WHERE slug=@slug`
 );
 const getBySlug = db.prepare("SELECT * FROM concepts WHERE slug = ?");
 const delBySlug = db.prepare("DELETE FROM concepts WHERE slug = ?");
@@ -99,13 +104,20 @@ function shape(row, { withBody = false } = {}) {
     stage: row.stage, anchored_at: row.anchored_at, due_at: dueAt(row),
     mastered: row.stage >= 3, starred: !!row.starred, tags: conceptTags(row.id)
   };
-  if (withBody) { out.body = row.body; out.notes = row.notes || ""; }
+  if (withBody) {
+    out.body = row.body;                       // legacy single-body (fallback)
+    out.problem = row.problem || "";
+    out.first_instinct = row.first_instinct || "";
+    out.quick = row.quick || "";
+    out.rundown = row.rundown || "";
+  }
   return out;
 }
 
 const createConcept = db.transaction((p) => {
   const now = Date.now();
-  const info = insConcept.run({ slug: p.slug, title: p.title, note: p.note || "", body: p.body || "", notes: p.notes || "", now });
+  const info = insConcept.run({ slug: p.slug, title: p.title, note: p.note || "", body: p.body || "",
+    problem: p.problem || "", first_instinct: p.first_instinct || "", quick: p.quick || "", rundown: p.rundown || "", now });
   setTags(info.lastInsertRowid, p.tags);
   return shape(getBySlug.get(p.slug), { withBody: true });
 });
@@ -113,7 +125,9 @@ const createConcept = db.transaction((p) => {
 const editConcept = db.transaction((slug, p) => {
   const row = getBySlug.get(slug);
   if (!row) return null;
-  updConcept.run({ slug, title: p.title ?? row.title, note: p.note ?? row.note, body: p.body ?? row.body, notes: p.notes ?? row.notes, now: Date.now() });
+  updConcept.run({ slug, title: p.title ?? row.title, note: p.note ?? row.note, body: p.body ?? row.body,
+    problem: p.problem ?? row.problem, first_instinct: p.first_instinct ?? row.first_instinct,
+    quick: p.quick ?? row.quick, rundown: p.rundown ?? row.rundown, now: Date.now() });
   if (p.tags !== undefined) setTags(row.id, p.tags);
   return shape(getBySlug.get(slug), { withBody: true });
 });
