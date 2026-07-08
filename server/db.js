@@ -58,6 +58,8 @@ for (const c of ["problem", "first_instinct", "key_takeaways", "quick", "rundown
 }
 // which page template a concept was authored with
 if (!cols.includes("structure_version")) db.exec("ALTER TABLE concepts ADD COLUMN structure_version TEXT NOT NULL DEFAULT 'v2'");
+// raw First Instinct notes staged for refinement (Claude refines, then writes first_instinct)
+if (!cols.includes("first_instinct_draft")) db.exec("ALTER TABLE concepts ADD COLUMN first_instinct_draft TEXT NOT NULL DEFAULT ''");
 
 const DAY = 86400000;
 const OFFSETS = [1, 4, 7];
@@ -115,6 +117,7 @@ function shape(row, { withBody = false } = {}) {
     out.key_takeaways = row.key_takeaways || "";
     out.quick = row.quick || "";
     out.rundown = row.rundown || "";
+    out.first_instinct_draft = row.first_instinct_draft || "";
   }
   return out;
 }
@@ -190,6 +193,11 @@ module.exports = {
     const row = getBySlug.get(slug); if (!row) return null;
     db.prepare("UPDATE concepts SET starred = ? WHERE id = ?").run(row.starred ? 0 : 1, row.id);
     return shape(getBySlug.get(slug));
+  },
+  setDraft: (slug, raw) => {
+    const row = getBySlug.get(slug); if (!row) return null;
+    db.prepare("UPDATE concepts SET first_instinct_draft = ? WHERE id = ?").run(String(raw || ""), row.id);
+    return shape(getBySlug.get(slug), { withBody: true });   // withBody → problem + key_takeaways available
   },
   tags: () => db.prepare(
     `SELECT t.name AS name, COUNT(ct.concept_id) AS count

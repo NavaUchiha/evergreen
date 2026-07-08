@@ -103,6 +103,25 @@ export function createServer() {
   );
 
   server.tool(
+    "refine_instinct",
+    "Prepare a First Instinct refinement for a concept. The server stores the user's raw notes as a draft and returns the concept's Problem Statement and Key Takeaways for context — it does NOT refine. YOU (Claude) then rewrite raw_notes to be clearer and simpler: keep their ideas and voice, use short sentences, add ASCII/text diagrams or concrete examples where they help, and do NOT add new concepts. Finally, call update_concept(slug, first_instinct=<your refined markdown>) to save it.",
+    {
+      slug: z.string().describe("Concept slug whose First Instinct to refine, e.g. \"max-subarray\""),
+      raw_notes: z.string().describe("The user's raw First Instinct notes to refine")
+    },
+    async ({ slug, raw_notes }) => {
+      if (!TOKEN) return fail("EVERGREEN_TOKEN not configured.");
+      try {
+        const d = await api("POST", "/concepts/" + encodeURIComponent(slug) + "/draft", { raw_notes }, true);
+        return ok({
+          slug: d.slug, raw_notes: d.raw_notes, problem: d.problem, key_takeaways: d.key_takeaways,
+          next_step: "Rewrite raw_notes to be clearer and simpler (keep their ideas and voice, short sentences, add ASCII diagrams or concrete examples where helpful, no new concepts), then call update_concept with first_instinct set to your refined markdown."
+        });
+      } catch (e) { return fail(e.message.includes("404") ? `No concept "${slug}"` : e.message); }
+    }
+  );
+
+  server.tool(
     "list_due_reviews",
     "List concepts due for review today (or overdue) per the 1·4·7 spaced-repetition schedule.",
     {},

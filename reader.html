@@ -110,12 +110,9 @@
     const sec=md.querySelector('.concept-sec[data-key="'+key+'"]');
     const content=sec.querySelector('.sec-content');
     const cur=concept[key]||"";
-    const refineBtn = key==="first_instinct"
-      ? '<button class="btn ghost sec-refine" title="Rewrite clearer with Claude">✨ Refine with Claude</button>' : '';
     content.innerHTML='<textarea class="sec-ta">'+esc(cur)+'</textarea>'
       + '<div class="sec-actions"><button class="btn primary sec-save">Save</button>'
-      + '<button class="btn ghost sec-cancel">Cancel</button>'+refineBtn+'</div>'
-      + '<div class="refine-preview" style="display:none"></div>';
+      + '<button class="btn ghost sec-cancel">Cancel</button></div>';
     const ta=content.querySelector('.sec-ta'); ta.focus();
     sec.querySelector('.sec-edit').style.visibility='hidden';
     content.querySelector('.sec-cancel').onclick=()=>renderSections();
@@ -124,29 +121,6 @@
         concept=c2; renderSections(); }
       catch(e){ alert(e.message); }
     };
-    const rb=content.querySelector('.sec-refine');
-    if(rb) rb.onclick=()=>refineNotes(content, ta, rb);
-  }
-
-  async function refineNotes(content, ta, btn){
-    const raw=ta.value.trim();
-    if(!raw){ alert("Write some notes first, then refine."); return; }
-    const prev=content.querySelector('.refine-preview');
-    const label=btn.textContent; btn.textContent="Refining…"; btn.disabled=true;
-    try{
-      const r=await EvergreenAPI.withAuth(()=>EvergreenAPI.refine({
-        raw_notes:raw, problem:concept.problem||"", key_takeaways:concept.key_takeaways||"" }));
-      if(!r) return;                       // password prompt cancelled
-      const refined=(r.refined||"").trim();
-      prev.innerHTML='<div class="refine-label">✨ Refined suggestion</div>'
-        +'<div class="md refine-body">'+marked.parse(refined||"*Claude returned nothing.*")+'</div>'
-        +'<div class="sec-actions"><button class="btn primary rf-replace">Replace my notes</button>'
-        +'<button class="btn ghost rf-keep">Keep original</button></div>';
-      prev.style.display='';
-      prev.querySelector('.rf-replace').onclick=()=>{ ta.value=refined; prev.style.display='none'; prev.innerHTML=''; ta.focus(); };
-      prev.querySelector('.rf-keep').onclick=()=>{ prev.style.display='none'; prev.innerHTML=''; };
-    }catch(e){ alert("Refine failed: "+e.message); }
-    finally{ btn.textContent=label; btn.disabled=false; }
   }
 
   if(!slug){ md.innerHTML='<div class="err">No concept specified. <a href="concepts.html">Pick one →</a></div>'; return; }

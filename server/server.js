@@ -3,8 +3,6 @@
    CORS is limited to the configured frontend origins. */
 const express = require("express");
 const cors = require("cors");
-const AnthropicSDK = require("@anthropic-ai/sdk");
-const Anthropic = AnthropicSDK.default || AnthropicSDK;   // works for CJS + ESM-interop builds
 const store = require("./db");
 
 const PORT = process.env.PORT || 3000;
@@ -107,38 +105,13 @@ app.post("/api/concepts/:slug/star", requireAuth, wrap((req, res) => {
   res.json(c);
 }));
 
-// --- refine notes with Claude ---
-const REFINE_SYSTEM = "You are refining someone's raw personal study notes about a technical concept. " +
-  "Your job is to keep their ideas and voice but make it clearer and simpler. Use short sentences. " +
-  "Add ASCII/text diagrams or concrete examples where they help. Do NOT add new concepts or explanations — " +
-  "only clarify what they already wrote. Return clean markdown, no preamble.";
-
-app.post("/api/refine", requireAuth, async (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: "Refine isn't configured — set ANTHROPIC_API_KEY on the server." });
-  const { raw_notes, problem, key_takeaways } = req.body || {};
-  if (!raw_notes || !String(raw_notes).trim()) return res.status(400).json({ error: "raw_notes required" });
-  try {
-    const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: REFINE_SYSTEM,
-      messages: [{
-        role: "user",
-        content: `Context — Problem: ${problem || ""}\n\nContext — Key Takeaways: ${key_takeaways || ""}\n\nMy raw notes to refine:\n${raw_notes}`
-      }]
-    });
-    const refined = msg.content.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
-    res.json({ refined });
-  } catch (e) {
-    console.error("refine error:", e && e.message);
-    const status = (e && e.status && e.status >= 400 && e.status < 600) ? e.status : 502;
-    // prefer the Anthropic structured message (e.error.error.message) over the raw JSON string
-    const detail = (e && e.error && e.error.error && e.error.error.message) || (e && e.message) || "refine failed";
-    res.status(status).json({ error: detail });
-  }
-});
+// --- First Instinct draft (server stores the raw draft + returns context; Claude refines) ---
+app.post("/api/concepts/:slug/draft", requireAuth, wrap((req, res) => {
+  const raw = String((req.body || {}).raw_notes || "");
+  const c = store.setDraft(req.params.slug, raw);
+  if (!c) return res.status(404).json({ error: "not found" });
+  res.json({ slug: c.slug, raw_notes: raw, problem: c.problem || "", key_takeaways: c.key_takeaways || "" });
+}));
 
 // --- tags ---
 app.get("/api/tags", wrap((_req, res) => res.json(store.tags())));
