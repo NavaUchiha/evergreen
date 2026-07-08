@@ -90,20 +90,37 @@ Reviewed **1, 4, 7 days** after day-0. `review` advances the stage; after stage 
 `forgot` re-anchors day-0 to today and restarts. `due_at` is computed by the API from
 `anchored_at + [1,4,7][stage]`.
 
-## Concept page format (voice to match when writing content)
+## Concept page format — structure **v2** (every page follows this exact order)
 
-1. **Intuition + first-principles derivation** — how you'd arrive at it cold.
-2. **Worked example** — real numbers, traced step by step.
-3. **Approaches + trade-offs** — brute force upward, comparison table.
-4. **Complexity (level-table style)** — sum work per level; Master Theorem only as cross-check.
-5. **Interview framing** — odds of deriving cold, the one sentence to say.
+Each concept is stored as separate section fields (not one blob). Defined once in
+`assets/sections.js` (the single source of truth the editor and reader both read), mirrored by
+the SQLite columns and the MCP tool params. `structure_version` records which template a page
+used (default `"v2"`).
 
-Tone: verbose, in-depth, simple. `concepts/max-subarray.md` is the reference for length and voice.
+| # | Section (field) | Icon | What goes here |
+|---|---|---|---|
+| 1 | Problem Statement (`problem`) | 🧩 | LC link, examples, constraints |
+| 2 | First Instinct (`first_instinct`) | 💭 | blank placeholder — the user fills their raw cold take |
+| 3 | Key Takeaways (`key_takeaways`) | 💡 | 3–5 bullet points, the most important things to remember |
+| 4 | Quick Version (`quick`) | ⚡ | the 60-second recap |
+| 5 | Rundown (`rundown`) | 📓 | full walkthrough, code, complexity (level-table style; Master Theorem only as cross-check) |
+| 6 | Comments (`comments`) | 💬 | blank placeholder at the bottom (timestamped log, not a section field) |
+
+Tone for the written sections: verbose, in-depth, but simple — show the reasoning that
+*generates* the answer, how you'd derive it cold. This structure is also embedded verbatim in the
+`publish_concept` / `update_concept` MCP tool descriptions, so an agent authoring pages must follow it.
+
+To change the template: edit `assets/sections.js` (adds/renames render everywhere), add the matching
+column in `server/db.js`, thread it through `server/server.js` + `mcp/tools.js`, and bump
+`structure_version`.
 
 ## Writing a concept now
 
-Use the **editor** (`editor.html`) — title, summary, tags, Markdown body with live preview, Save.
-It POSTs/PUTs to the backend and persists in SQLite. For bulk import of existing `.md` files:
+- **Inline (easiest):** open a concept in `reader.html` and click **＋ add / edit** on any section
+  — type in place, Save writes just that section via the API.
+- **Full editor:** `editor.html` — title, summary, tags, and one textarea per section with a combined
+  live preview.
+Both POST/PUT to the backend and persist in SQLite. Legacy `.md` bulk import (lands in Rundown):
 `EVERGREEN_TOKEN=… ./import-concept.sh concepts/<slug>.md "tag1,tag2"`.
 
 ## Deployment
