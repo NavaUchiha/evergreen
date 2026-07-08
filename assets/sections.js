@@ -3,10 +3,11 @@
 (function (global) {
   "use strict";
   const SECTIONS = [
-    { key: "problem",        label: "Problem statement", icon: "🧩", hint: "The problem / question / constraints…" },
-    { key: "first_instinct", label: "First Instinct",    icon: "💭", hint: "Your raw first thoughts, before the answer…" },
+    { key: "problem",        label: "Problem Statement", icon: "🧩", hint: "LC link, examples, constraints…" },
+    { key: "first_instinct", label: "First Instinct",    icon: "💭", hint: "Blank placeholder — your raw first thoughts, before the answer…" },
+    { key: "key_takeaways",  label: "Key Takeaways",     icon: "💡", hint: "3–5 bullet points — the most important things to remember…" },
     { key: "quick",          label: "Quick Version",     icon: "⚡", hint: "The 60-second recap…" },
-    { key: "rundown",        label: "Rundown",           icon: "📓", hint: "The full walkthrough…" }
+    { key: "rundown",        label: "Rundown",           icon: "📓", hint: "Full walkthrough, code, complexity…" }
   ];
   function esc(s) { return String(s).replace(/[&<>]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m])); }
 

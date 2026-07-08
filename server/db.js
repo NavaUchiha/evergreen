@@ -52,10 +52,12 @@ CREATE INDEX IF NOT EXISTS idx_reviews_concept ON reviews(concept_id);
 // --- migrations ---
 const cols = db.prepare("PRAGMA table_info(concepts)").all().map(c => c.name);
 if (!cols.includes("starred")) db.exec("ALTER TABLE concepts ADD COLUMN starred INTEGER NOT NULL DEFAULT 0");
-// content sections (each markdown): problem statement, first instinct, quick version, rundown
-for (const c of ["problem", "first_instinct", "quick", "rundown"]) {
+// content sections (each markdown): problem, first instinct, key takeaways, quick version, rundown
+for (const c of ["problem", "first_instinct", "key_takeaways", "quick", "rundown"]) {
   if (!cols.includes(c)) db.exec(`ALTER TABLE concepts ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
 }
+// which page template a concept was authored with
+if (!cols.includes("structure_version")) db.exec("ALTER TABLE concepts ADD COLUMN structure_version TEXT NOT NULL DEFAULT 'v2'");
 
 const DAY = 86400000;
 const OFFSETS = [1, 4, 7];
@@ -84,12 +86,13 @@ function conceptTags(id) { return tagsForConcept.all(id).map(r => r.name); }
 
 /* ---- concepts ---- */
 const insConcept = db.prepare(
-  `INSERT INTO concepts(slug,title,note,body,problem,first_instinct,quick,rundown,created_at,updated_at,stage,anchored_at)
-   VALUES(@slug,@title,@note,@body,@problem,@first_instinct,@quick,@rundown,@now,@now,0,@now)`
+  `INSERT INTO concepts(slug,title,note,body,problem,first_instinct,key_takeaways,quick,rundown,structure_version,created_at,updated_at,stage,anchored_at)
+   VALUES(@slug,@title,@note,@body,@problem,@first_instinct,@key_takeaways,@quick,@rundown,@structure_version,@now,@now,0,@now)`
 );
 const updConcept = db.prepare(
   `UPDATE concepts SET title=@title, note=@note, body=@body,
-     problem=@problem, first_instinct=@first_instinct, quick=@quick, rundown=@rundown, updated_at=@now
+     problem=@problem, first_instinct=@first_instinct, key_takeaways=@key_takeaways, quick=@quick, rundown=@rundown,
+     structure_version=@structure_version, updated_at=@now
    WHERE slug=@slug`
 );
 const getBySlug = db.prepare("SELECT * FROM concepts WHERE slug = ?");
@@ -104,10 +107,12 @@ function shape(row, { withBody = false } = {}) {
     stage: row.stage, anchored_at: row.anchored_at, due_at: dueAt(row),
     mastered: row.stage >= 3, starred: !!row.starred, tags: conceptTags(row.id)
   };
+  out.structure_version = row.structure_version || "v2";
   if (withBody) {
     out.body = row.body;                       // legacy single-body (fallback)
     out.problem = row.problem || "";
     out.first_instinct = row.first_instinct || "";
+    out.key_takeaways = row.key_takeaways || "";
     out.quick = row.quick || "";
     out.rundown = row.rundown || "";
   }
@@ -117,7 +122,8 @@ function shape(row, { withBody = false } = {}) {
 const createConcept = db.transaction((p) => {
   const now = Date.now();
   const info = insConcept.run({ slug: p.slug, title: p.title, note: p.note || "", body: p.body || "",
-    problem: p.problem || "", first_instinct: p.first_instinct || "", quick: p.quick || "", rundown: p.rundown || "", now });
+    problem: p.problem || "", first_instinct: p.first_instinct || "", key_takeaways: p.key_takeaways || "",
+    quick: p.quick || "", rundown: p.rundown || "", structure_version: p.structure_version || "v2", now });
   setTags(info.lastInsertRowid, p.tags);
   return shape(getBySlug.get(p.slug), { withBody: true });
 });
@@ -127,7 +133,8 @@ const editConcept = db.transaction((slug, p) => {
   if (!row) return null;
   updConcept.run({ slug, title: p.title ?? row.title, note: p.note ?? row.note, body: p.body ?? row.body,
     problem: p.problem ?? row.problem, first_instinct: p.first_instinct ?? row.first_instinct,
-    quick: p.quick ?? row.quick, rundown: p.rundown ?? row.rundown, now: Date.now() });
+    key_takeaways: p.key_takeaways ?? row.key_takeaways, quick: p.quick ?? row.quick, rundown: p.rundown ?? row.rundown,
+    structure_version: p.structure_version ?? row.structure_version, now: Date.now() });
   if (p.tags !== undefined) setTags(row.id, p.tags);
   return shape(getBySlug.get(slug), { withBody: true });
 });
