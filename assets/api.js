@@ -101,6 +101,7 @@
     deleteComment: (id) => req("DELETE", "/comments/" + id),
     review: (slug) => req("POST", "/concepts/" + encodeURIComponent(slug) + "/review"),
     forgot: (slug) => req("POST", "/concepts/" + encodeURIComponent(slug) + "/forgot"),
+    toggleStar: (slug) => req("POST", "/concepts/" + encodeURIComponent(slug) + "/star"),
     tags: () => req("GET", "/tags")
   };
 

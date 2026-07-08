@@ -98,6 +98,13 @@ app.post("/api/concepts/:slug/forgot", requireAuth, wrap((req, res) => {
   res.json(c);
 }));
 
+// --- star / favorite ---
+app.post("/api/concepts/:slug/star", requireAuth, wrap((req, res) => {
+  const c = store.toggleStar(req.params.slug);
+  if (!c) return res.status(404).json({ error: "not found" });
+  res.json(c);
+}));
+
 // --- tags ---
 app.get("/api/tags", wrap((_req, res) => res.json(store.tags())));
 

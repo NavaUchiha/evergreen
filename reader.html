@@ -59,6 +59,7 @@
       return '<span class="dot '+(done?"done":active?"active":"")+'" title="day '+[1,4,7][i]+'" style="width:22px;height:22px;font-size:10px">'+[1,4,7][i]+'</span>'; }).join(" ");
     meta.innerHTML = '<span class="chiprow">'+tags+'</span>'
       + '<span class="reader-actions">'
+      + '<button class="abtn star'+(c.starred?" on":"")+'" id="starBtn" title="'+(c.starred?"Unstar":"Star")+'">'+(c.starred?"★":"☆")+'</button>'
       + '<span class="badge '+badgeCls+'">'+esc(relDue(c))+'</span>'
       + '<span style="display:inline-flex;gap:4px;align-items:center">'+dots+'</span>'
       + (c.stage<3?'<button class="abtn review" id="reviewBtn">Reviewed ✓</button>':'')
@@ -67,6 +68,7 @@
       + '</span>';
     const rb=$("reviewBtn"); if(rb) rb.onclick=()=>act(EvergreenAPI.review);
     $("forgotBtn").onclick=()=>act(EvergreenAPI.forgot);
+    $("starBtn").onclick=async()=>{ try{ const c2=await EvergreenAPI.withAuth(()=>EvergreenAPI.toggleStar(slug)); if(!c2) return; concept.starred=c2.starred; renderMeta(); }catch(e){ alert(e.message); } };
   }
   async function act(fn){
     try{ const c=await EvergreenAPI.withAuth(()=>fn(slug)); if(!c) return;

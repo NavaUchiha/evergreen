@@ -49,6 +49,10 @@ CREATE INDEX IF NOT EXISTS idx_comments_concept ON comments(concept_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_concept ON reviews(concept_id);
 `);
 
+// --- migrations ---
+const cols = db.prepare("PRAGMA table_info(concepts)").all().map(c => c.name);
+if (!cols.includes("starred")) db.exec("ALTER TABLE concepts ADD COLUMN starred INTEGER NOT NULL DEFAULT 0");
+
 const DAY = 86400000;
 const OFFSETS = [1, 4, 7];
 function dueAt(row) { return row.stage >= 3 ? null : row.anchored_at + OFFSETS[row.stage] * DAY; }
@@ -92,7 +96,7 @@ function shape(row, { withBody = false } = {}) {
     slug: row.slug, title: row.title, note: row.note,
     created_at: row.created_at, updated_at: row.updated_at,
     stage: row.stage, anchored_at: row.anchored_at, due_at: dueAt(row),
-    mastered: row.stage >= 3, tags: conceptTags(row.id)
+    mastered: row.stage >= 3, starred: !!row.starred, tags: conceptTags(row.id)
   };
   if (withBody) out.body = row.body;
   return out;
@@ -160,6 +164,11 @@ module.exports = {
   },
   deleteComment: (id) => delComment.run(id).changes > 0,
   review: doReview, forgot: doForgot,
+  toggleStar: (slug) => {
+    const row = getBySlug.get(slug); if (!row) return null;
+    db.prepare("UPDATE concepts SET starred = ? WHERE id = ?").run(row.starred ? 0 : 1, row.id);
+    return shape(getBySlug.get(slug));
+  },
   tags: () => db.prepare(
     `SELECT t.name AS name, COUNT(ct.concept_id) AS count
      FROM tags t LEFT JOIN concept_tags ct ON ct.tag_id = t.id

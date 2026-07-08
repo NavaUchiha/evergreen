@@ -215,6 +215,13 @@ header.tracker-head{padding:2px 0 18px; display:flex; align-items:flex-end; just
 .comment-add textarea{flex:1; background:#0A0E12; border:1px solid var(--line); border-radius:9px; color:var(--ink); font-family:var(--ui); font-size:14px; padding:9px 11px; resize:vertical; min-height:44px; outline:none}
 .comment-add textarea:focus{border-color:var(--brand)}
 
+/* ---- star / favorite ---- */
+.abtn.star{background:transparent; border:1px solid var(--line); color:var(--muted); font-size:15px; line-height:1; padding:6px 10px}
+.abtn.star:hover{border-color:var(--due); color:var(--due)}
+.abtn.star.on{color:var(--due); border-color:var(--due); background:var(--due-soft)}
+.concept-row .star-ind{flex:none; color:var(--due); font-size:15px; width:16px; text-align:center}
+.concept-row .star-ind.off{color:transparent}
+
 /* ---- password modal ---- */
 .pw-overlay{position:fixed; inset:0; background:rgba(6,10,14,.66); backdrop-filter:blur(3px);
   display:flex; align-items:center; justify-content:center; padding:20px; z-index:1000; animation:fade .15s ease both}
