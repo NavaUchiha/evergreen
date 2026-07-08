@@ -4,7 +4,7 @@
 # Token: reads $EVERGREEN_TOKEN, or ~/.evergreen-token.
 set -euo pipefail
 
-API="${EVERGREEN_API:-https://140.245.228.37.sslip.io/api}"
+API="${EVERGREEN_API:-https://140.245.233.61.sslip.io/api}"
 FILE="${1:?path to a .md file required}"
 TAGS="${2:-}"
 TOKEN="${EVERGREEN_TOKEN:-$(cat ~/.evergreen-token 2>/dev/null || true)}"

@@ -23,7 +23,7 @@ import-concept.sh      # CLI: POST a local .md file into the backend
 concepts/*.md          # ARCHIVE ONLY — original source files; app no longer reads these
 ```
 
-**API base:** `https://140.245.228.37.sslip.io/api` (set in `assets/api.js`).
+**API base:** `https://140.245.233.61.sslip.io/api` (set in `assets/api.js`).
 `sslip.io` gives the OCI IP a DNS name so Caddy can hold a Let's Encrypt cert (no domain bought).
 
 ## Backend (`server/`, deployed to the OCI box, NOT to Pages)
@@ -32,7 +32,7 @@ concepts/*.md          # ARCHIVE ONLY — original source files; app no longer r
 server/server.js            # Express app — routes + CORS + bearer auth
 server/db.js                # SQLite schema + data access (better-sqlite3)
 server/package.json         # deps: express, cors, better-sqlite3
-server/Caddyfile            # reverse proxy + auto-HTTPS for 140.245.228.37.sslip.io
+server/Caddyfile            # reverse proxy + auto-HTTPS for 140.245.233.61.sslip.io
 server/evergreen-api.service# systemd unit (User=ubuntu, EnvironmentFile=.env)
 ```
 
@@ -68,6 +68,21 @@ snapshot (better-sqlite3 online backup) → gzip → HTTP PUT to an **OCI Object
 `evergreen-backups` via a write-only **Pre-Authenticated Request** (URL stored in
 `~/evergreen/backup.env`, the only secret; no OCI keys on the box). Restore = download the latest
 `evergreen-*.db.gz`, gunzip, replace `~/evergreen/data/evergreen.db`, restart the service.
+
+## MCP servers (`mcp/`)
+
+Tools: `publish_concept(title, summary, tags, body)`, `list_due_reviews()`, `get_concept(slug)`.
+Shared defs in `mcp/tools.js` (`createServer`). Two transports:
+- `mcp/server.js` — **stdio**, for Claude Code (registered via `claude mcp add`, token in env).
+- `mcp/remote.js` — **Streamable HTTP** (Express, stateless), for **claude.ai** browser connectors.
+  Deployed on the box as systemd `evergreen-mcp` (port 3001), exposed by Caddy at a *secret path*
+  `https://<host>/mcp/<SECRET>`. The secret is only in the box's Caddyfile; rotate to revoke.
+
+## Networking
+
+The instance now has a **reserved** public IP `140.245.233.61` (survives stop/start). If it ever
+changes, update: `assets/api.js` BASE, `mcp/tools.js` default, the box Caddyfile hostname, the MCP
+`.env` `EVERGREEN_API`, and `~/.ssh/config`. Security list allows 22/80/443/8080.
 
 ## The 1·4·7 rule (now server-side)
 

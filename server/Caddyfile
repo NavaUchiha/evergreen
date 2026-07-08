@@ -1,7 +1,7 @@
 # Evergreen — reverse proxy with automatic HTTPS (Let's Encrypt).
-# The sslip.io hostname resolves 140.245.228.37.sslip.io -> 140.245.228.37,
+# The sslip.io hostname resolves 140.245.233.61.sslip.io -> 140.245.233.61,
 # so Caddy can obtain a real cert with no domain purchase.
-140.245.228.37.sslip.io {
+140.245.233.61.sslip.io {
 	encode gzip
 	reverse_proxy 127.0.0.1:3000
 }

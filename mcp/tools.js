@@ -3,7 +3,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-const API = (process.env.EVERGREEN_API || "https://140.245.228.37.sslip.io/api").replace(/\/$/, "");
+const API = (process.env.EVERGREEN_API || "https://140.245.233.61.sslip.io/api").replace(/\/$/, "");
 const TOKEN = process.env.EVERGREEN_TOKEN || "";
 const SITE = (process.env.EVERGREEN_SITE || "https://navauchiha.github.io/evergreen").replace(/\/$/, "");
 

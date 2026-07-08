@@ -2,7 +2,7 @@
    Reads are open; writes send a bearer password the user enters once. */
 (function (global) {
   "use strict";
-  const BASE = "https://140.245.228.37.sslip.io/api";
+  const BASE = "https://140.245.233.61.sslip.io/api";
   const KEY = "evergreen_token";
 
   async function req(method, path, body) {
