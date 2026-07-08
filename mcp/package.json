@@ -1,0 +1,12 @@
+{
+  "name": "evergreen-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server exposing Evergreen tools: publish_concept, list_due_reviews, get_concept.",
+  "bin": { "evergreen-mcp": "server.js" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  }
+}
