@@ -42,6 +42,44 @@ export function createServer() {
   );
 
   server.tool(
+    "update_concept",
+    "Update an existing Evergreen concept in place, by slug — improve a page without creating a duplicate. Any of title/summary/tags/body may be given; omit a field to leave it unchanged.",
+    {
+      slug: z.string().describe("Slug of the concept to update, e.g. \"max-subarray\""),
+      title: z.string().optional().describe("New title"),
+      summary: z.string().optional().describe("New one-line summary"),
+      tags: z.array(z.string()).optional().describe("New full tag list (replaces existing)"),
+      body: z.string().optional().describe("New full Markdown body (replaces existing)")
+    },
+    async ({ slug, title, summary, tags, body }) => {
+      if (!TOKEN) return fail("EVERGREEN_TOKEN not configured — cannot update.");
+      const payload = {};
+      if (title !== undefined) payload.title = title;
+      if (summary !== undefined) payload.note = summary;
+      if (tags !== undefined) payload.tags = tags;
+      if (body !== undefined) payload.body = body;
+      if (Object.keys(payload).length === 0) return fail("Nothing to update — provide title, summary, tags, or body.");
+      try {
+        const c = await api("PUT", "/concepts/" + encodeURIComponent(slug), payload, true);
+        return ok({ id: c.slug, slug: c.slug, url: urlFor(c.slug), title: c.title, tags: c.tags, updated_at: c.updated_at });
+      } catch (e) { return fail(e.message.includes("404") ? `No concept "${slug}"` : e.message); }
+    }
+  );
+
+  server.tool(
+    "delete_concept",
+    "Permanently delete an Evergreen concept by slug. This cannot be undone.",
+    { slug: z.string().describe("Slug of the concept to delete") },
+    async ({ slug }) => {
+      if (!TOKEN) return fail("EVERGREEN_TOKEN not configured — cannot delete.");
+      try {
+        const r = await api("DELETE", "/concepts/" + encodeURIComponent(slug), undefined, true);
+        return ok({ deleted: !!(r && r.deleted), slug });
+      } catch (e) { return fail(e.message); }
+    }
+  );
+
+  server.tool(
     "list_due_reviews",
     "List concepts due for review today (or overdue) per the 1·4·7 spaced-repetition schedule.",
     {},
