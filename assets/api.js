@@ -102,6 +102,7 @@
     review: (slug) => req("POST", "/concepts/" + encodeURIComponent(slug) + "/review"),
     forgot: (slug) => req("POST", "/concepts/" + encodeURIComponent(slug) + "/forgot"),
     toggleStar: (slug) => req("POST", "/concepts/" + encodeURIComponent(slug) + "/star"),
+    refine: (payload) => req("POST", "/refine", payload),
     tags: () => req("GET", "/tags")
   };
 

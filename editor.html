@@ -90,6 +90,36 @@
   ).join("");
   const areas = EVERGREEN_SECTIONS.map(s => $("sec_"+s.key));
 
+  // ✨ Refine with Claude — attached under the First Instinct textarea
+  const fiArea = $("sec_first_instinct");
+  if (fiArea) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = '<button type="button" class="btn ghost sec-refine" id="refineFI" style="margin:-4px 0 12px">✨ Refine with Claude</button>'
+      + '<div class="refine-preview" id="fiPreview" style="display:none;margin:0 0 12px"></div>';
+    fiArea.after(wrap);
+    $("refineFI").onclick = refineFI;
+  }
+  async function refineFI(){
+    const btn=$("refineFI"), prev=$("fiPreview");
+    const raw=(fiArea.value||"").trim();
+    if(!raw){ flash("Write First Instinct notes first.", true); fiArea.focus(); return; }
+    const label=btn.textContent; btn.textContent="Refining…"; btn.disabled=true;
+    try{
+      const r=await EvergreenAPI.withAuth(()=>EvergreenAPI.refine({
+        raw_notes:raw, problem:$("sec_problem").value, key_takeaways:$("sec_key_takeaways").value }));
+      if(!r) return;
+      const refined=(r.refined||"").trim();
+      prev.innerHTML='<div class="refine-label">✨ Refined suggestion</div>'
+        +'<div class="md refine-body">'+marked.parse(refined||"*Claude returned nothing.*")+'</div>'
+        +'<div class="sec-actions" style="margin-top:10px"><button type="button" class="btn primary" id="fiReplace">Replace my notes</button>'
+        +'<button type="button" class="btn ghost" id="fiKeep">Keep original</button></div>';
+      prev.style.display="";
+      $("fiReplace").onclick=()=>{ fiArea.value=refined; prev.style.display="none"; prev.innerHTML=""; renderPreview(); fiArea.focus(); };
+      $("fiKeep").onclick=()=>{ prev.style.display="none"; prev.innerHTML=""; };
+    }catch(e){ flash("Refine failed: "+e.message, true); }
+    finally{ btn.textContent=label; btn.disabled=false; }
+  }
+
   // token bar
   const tokenbar = $("tokenbar"), tokenInput = $("token");
   function refreshToken(){ const ok = EvergreenAPI.hasToken();

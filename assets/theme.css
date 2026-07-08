@@ -231,6 +231,13 @@ header.tracker-head{padding:2px 0 18px; display:flex; align-items:flex-end; just
 .md .sec-ta:focus{ border-color:var(--brand) }
 .md .sec-actions{ display:flex; gap:8px; margin-top:10px }
 
+/* ---- refine with Claude ---- */
+.refine-preview{ margin-top:14px; border:1px solid var(--brand); border-radius:12px; padding:14px 16px; background:var(--brand-soft) }
+.refine-label{ font-family:var(--mono); font-size:12px; color:var(--brand-ink); margin-bottom:8px }
+.refine-preview .refine-body{ background:none; border:0; padding:0; margin:0 }
+.refine-preview .refine-body > *:first-child{ margin-top:0 }
+.sec-refine{ font-size:12.5px }
+
 /* ---- star / favorite ---- */
 .abtn.star{background:transparent; border:1px solid var(--line); color:var(--muted); font-size:15px; line-height:1; padding:6px 10px}
 .abtn.star:hover{border-color:var(--due); color:var(--due)}
