@@ -134,7 +134,9 @@ app.post("/api/refine", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("refine error:", e && e.message);
     const status = (e && e.status && e.status >= 400 && e.status < 600) ? e.status : 502;
-    res.status(status).json({ error: (e && e.message) || "refine failed" });
+    // prefer the Anthropic structured message (e.error.error.message) over the raw JSON string
+    const detail = (e && e.error && e.error.error && e.error.error.message) || (e && e.message) || "refine failed";
+    res.status(status).json({ error: detail });
   }
 });
 
