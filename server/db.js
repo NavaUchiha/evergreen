@@ -52,6 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_reviews_concept ON reviews(concept_id);
 // --- migrations ---
 const cols = db.prepare("PRAGMA table_info(concepts)").all().map(c => c.name);
 if (!cols.includes("starred")) db.exec("ALTER TABLE concepts ADD COLUMN starred INTEGER NOT NULL DEFAULT 0");
+if (!cols.includes("notes")) db.exec("ALTER TABLE concepts ADD COLUMN notes TEXT NOT NULL DEFAULT ''"); // personal "My Notes" (markdown)
 
 const DAY = 86400000;
 const OFFSETS = [1, 4, 7];
@@ -80,11 +81,11 @@ function conceptTags(id) { return tagsForConcept.all(id).map(r => r.name); }
 
 /* ---- concepts ---- */
 const insConcept = db.prepare(
-  `INSERT INTO concepts(slug,title,note,body,created_at,updated_at,stage,anchored_at)
-   VALUES(@slug,@title,@note,@body,@now,@now,0,@now)`
+  `INSERT INTO concepts(slug,title,note,body,notes,created_at,updated_at,stage,anchored_at)
+   VALUES(@slug,@title,@note,@body,@notes,@now,@now,0,@now)`
 );
 const updConcept = db.prepare(
-  `UPDATE concepts SET title=@title, note=@note, body=@body, updated_at=@now WHERE slug=@slug`
+  `UPDATE concepts SET title=@title, note=@note, body=@body, notes=@notes, updated_at=@now WHERE slug=@slug`
 );
 const getBySlug = db.prepare("SELECT * FROM concepts WHERE slug = ?");
 const delBySlug = db.prepare("DELETE FROM concepts WHERE slug = ?");
@@ -98,13 +99,13 @@ function shape(row, { withBody = false } = {}) {
     stage: row.stage, anchored_at: row.anchored_at, due_at: dueAt(row),
     mastered: row.stage >= 3, starred: !!row.starred, tags: conceptTags(row.id)
   };
-  if (withBody) out.body = row.body;
+  if (withBody) { out.body = row.body; out.notes = row.notes || ""; }
   return out;
 }
 
 const createConcept = db.transaction((p) => {
   const now = Date.now();
-  const info = insConcept.run({ slug: p.slug, title: p.title, note: p.note || "", body: p.body || "", now });
+  const info = insConcept.run({ slug: p.slug, title: p.title, note: p.note || "", body: p.body || "", notes: p.notes || "", now });
   setTags(info.lastInsertRowid, p.tags);
   return shape(getBySlug.get(p.slug), { withBody: true });
 });
@@ -112,7 +113,7 @@ const createConcept = db.transaction((p) => {
 const editConcept = db.transaction((slug, p) => {
   const row = getBySlug.get(slug);
   if (!row) return null;
-  updConcept.run({ slug, title: p.title ?? row.title, note: p.note ?? row.note, body: p.body ?? row.body, now: Date.now() });
+  updConcept.run({ slug, title: p.title ?? row.title, note: p.note ?? row.note, body: p.body ?? row.body, notes: p.notes ?? row.notes, now: Date.now() });
   if (p.tags !== undefined) setTags(row.id, p.tags);
   return shape(getBySlug.get(slug), { withBody: true });
 });

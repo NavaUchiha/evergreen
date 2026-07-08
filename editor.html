@@ -61,6 +61,12 @@
     </div>
   </div>
 
+  <div class="ed-field" style="margin-top:16px">
+    <label for="notes">📝 My Notes <span style="text-transform:none;color:#5D6B78">— personal, renders after the body</span></label>
+    <textarea id="notes" placeholder="Your own notes: gotchas, a 60-second recap, the interview line…"
+      style="width:100%;min-height:24vh;background:#0A0E12;border:1px solid var(--line);border-radius:10px;color:#D6E0EA;font-family:var(--mono);font-size:13px;line-height:1.6;padding:14px 16px;outline:none;resize:vertical"></textarea>
+  </div>
+
   <div class="ed-save-row">
     <button class="btn primary" id="saveBtn2">Save concept</button>
     <span class="saved" id="savedMsg"></span>
@@ -108,6 +114,7 @@
       title,
       note: $("note").value.trim(),
       body: body.value,
+      notes: $("notes").value,
       tags: $("tags").value.split(",").map(s=>s.trim()).filter(Boolean)
     };
     $("status").textContent = "saving…";
@@ -138,7 +145,7 @@
     EvergreenAPI.getConcept(editingSlug).then(c=>{
       existing = c;
       $("title").value = c.title; $("note").value = c.note || "";
-      $("tags").value = (c.tags||[]).join(", "); body.value = c.body || "";
+      $("tags").value = (c.tags||[]).join(", "); body.value = c.body || ""; $("notes").value = c.notes || "";
       $("slughint").textContent = "url slug: " + c.slug + "  (fixed)";
       renderPreview();
     }).catch(e=> flash("Couldn't load: "+e.message, true));

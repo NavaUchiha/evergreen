@@ -26,6 +26,23 @@
 
   <div class="reader-meta" id="meta"></div>
   <article class="md" id="md"><div class="loading">Loading…</div></article>
+
+  <section class="section" id="notesSection" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+      <h3 style="margin:0">📝 My Notes</h3>
+      <button class="edit" id="editNotesBtn">edit</button>
+    </div>
+    <div class="md" id="notesView" style="background:none;border:0;padding:0;margin:0"></div>
+    <div id="notesEditor" style="display:none">
+      <textarea id="notesArea" placeholder="Your own notes, gotchas, the interview line…"
+        style="width:100%;min-height:26vh;background:#0A0E12;border:1px solid var(--line);border-radius:10px;color:#D6E0EA;font-family:var(--mono);font-size:13px;line-height:1.6;padding:14px 16px;outline:none;resize:vertical"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn primary" id="saveNotesBtn">Save notes</button>
+        <button class="btn ghost" id="cancelNotesBtn">Cancel</button>
+      </div>
+    </div>
+  </section>
+
   <section class="section" id="comments" style="display:none">
     <h3>Comments &amp; notes</h3>
     <div id="commentList"></div>
@@ -90,11 +107,28 @@
     try{ const c=await EvergreenAPI.withAuth(()=>EvergreenAPI.addComment(slug,t)); if(!c) return;
       concept.comments=(concept.comments||[]).concat(c); $("commentBody").value=""; renderComments(); }catch(e){ alert(e.message); } };
 
+  // --- My Notes (personal, renders after the body) ---
+  function renderNotes(){
+    const has = concept.notes && concept.notes.trim();
+    $("notesView").innerHTML = has ? marked.parse(concept.notes)
+      : '<p class="slughint">No notes yet — jot down your own take, gotchas, or the interview line.</p>';
+    $("editNotesBtn").textContent = has ? "edit" : "＋ add notes";
+    $("notesView").style.display=""; $("notesEditor").style.display="none";
+  }
+  $("editNotesBtn").onclick=()=>{ $("notesArea").value=concept.notes||""; $("notesView").style.display="none"; $("notesEditor").style.display=""; $("notesArea").focus(); };
+  $("cancelNotesBtn").onclick=()=>{ $("notesEditor").style.display="none"; $("notesView").style.display=""; };
+  $("saveNotesBtn").onclick=async()=>{
+    try{ const c2=await EvergreenAPI.withAuth(()=>EvergreenAPI.updateConcept(slug,{notes:$("notesArea").value})); if(!c2) return;
+      concept.notes=c2.notes; renderNotes(); }
+    catch(e){ alert(e.message); }
+  };
+
   if(!slug){ md.innerHTML='<div class="err">No concept specified. <a href="concepts.html">Pick one →</a></div>'; return; }
   EvergreenAPI.getConcept(slug).then(c=>{
     concept=c; document.title=c.title+" — Evergreen";
     renderMeta();
     md.innerHTML = marked.parse(c.body || "*This concept has no content yet — hit edit to write it.*");
+    $("notesSection").style.display=""; renderNotes();
     $("comments").style.display=""; renderComments();
   }).catch(e=>{ md.innerHTML='<div class="err">'+esc(e.message)+'<br><a href="concepts.html">Back to concepts →</a></div>'; });
 })();

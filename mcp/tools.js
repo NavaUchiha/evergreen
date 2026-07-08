@@ -30,12 +30,13 @@ export function createServer() {
       title: z.string().describe("Concept title, e.g. \"Dijkstra's shortest path\""),
       summary: z.string().optional().describe("One-line summary shown in the catalog"),
       tags: z.array(z.string()).optional().describe("Tags, e.g. [\"graphs\",\"greedy\"]"),
-      body: z.string().describe("The full concept content in Markdown")
+      body: z.string().describe("The full concept content in Markdown"),
+      notes: z.string().optional().describe("Personal \"My Notes\" (Markdown), rendered after the body")
     },
-    async ({ title, summary, tags, body }) => {
+    async ({ title, summary, tags, body, notes }) => {
       if (!TOKEN) return fail("EVERGREEN_TOKEN not configured — cannot publish.");
       try {
-        const c = await api("POST", "/concepts", { title, note: summary || "", tags: tags || [], body }, true);
+        const c = await api("POST", "/concepts", { title, note: summary || "", tags: tags || [], body, notes: notes || "" }, true);
         return ok({ id: c.slug, slug: c.slug, url: urlFor(c.slug), title: c.title, tags: c.tags });
       } catch (e) { return fail(e.message); }
     }
@@ -49,16 +50,18 @@ export function createServer() {
       title: z.string().optional().describe("New title"),
       summary: z.string().optional().describe("New one-line summary"),
       tags: z.array(z.string()).optional().describe("New full tag list (replaces existing)"),
-      body: z.string().optional().describe("New full Markdown body (replaces existing)")
+      body: z.string().optional().describe("New full Markdown body (replaces existing)"),
+      notes: z.string().optional().describe("New personal \"My Notes\" (Markdown, replaces existing)")
     },
-    async ({ slug, title, summary, tags, body }) => {
+    async ({ slug, title, summary, tags, body, notes }) => {
       if (!TOKEN) return fail("EVERGREEN_TOKEN not configured — cannot update.");
       const payload = {};
       if (title !== undefined) payload.title = title;
       if (summary !== undefined) payload.note = summary;
       if (tags !== undefined) payload.tags = tags;
       if (body !== undefined) payload.body = body;
-      if (Object.keys(payload).length === 0) return fail("Nothing to update — provide title, summary, tags, or body.");
+      if (notes !== undefined) payload.notes = notes;
+      if (Object.keys(payload).length === 0) return fail("Nothing to update — provide title, summary, tags, body, or notes.");
       try {
         const c = await api("PUT", "/concepts/" + encodeURIComponent(slug), payload, true);
         return ok({ id: c.slug, slug: c.slug, url: urlFor(c.slug), title: c.title, tags: c.tags, updated_at: c.updated_at });
@@ -110,7 +113,7 @@ export function createServer() {
         return ok({
           slug: c.slug, title: c.title, summary: c.note, tags: c.tags,
           starred: c.starred, stage: c.stage, mastered: c.mastered, due_at: c.due_at,
-          body: c.body, comments: c.comments, url: urlFor(c.slug)
+          body: c.body, notes: c.notes, comments: c.comments, url: urlFor(c.slug)
         });
       } catch (e) { return fail(e.message.includes("404") ? `No concept "${slug}"` : e.message); }
     }

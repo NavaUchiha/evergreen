@@ -56,16 +56,16 @@ app.get("/api/concepts/:slug", wrap((req, res) => {
 }));
 
 app.post("/api/concepts", requireAuth, wrap((req, res) => {
-  const { title, note, body, tags } = req.body || {};
+  const { title, note, body, notes, tags } = req.body || {};
   if (!title || !String(title).trim()) return res.status(400).json({ error: "title required" });
   const slug = slugify(req.body.slug || title);
   if (!slug) return res.status(400).json({ error: "could not derive slug" });
-  res.status(201).json(store.createConcept({ slug, title: String(title).trim(), note, body, tags }));
+  res.status(201).json(store.createConcept({ slug, title: String(title).trim(), note, body, notes, tags }));
 }));
 
 app.put("/api/concepts/:slug", requireAuth, wrap((req, res) => {
-  const { title, note, body, tags } = req.body || {};
-  const updated = store.editConcept(req.params.slug, { title, note, body, tags });
+  const { title, note, body, notes, tags } = req.body || {};
+  const updated = store.editConcept(req.params.slug, { title, note, body, notes, tags });
   if (!updated) return res.status(404).json({ error: "not found" });
   res.json(updated);
 }));
