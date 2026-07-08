@@ -92,13 +92,44 @@
     try{ const c=await EvergreenAPI.withAuth(()=>EvergreenAPI.addComment(slug,t)); if(!c) return;
       concept.comments=(concept.comments||[]).concat(c); $("commentBody").value=""; renderComments(); }catch(e){ alert(e.message); } };
 
+  // --- render every section (incl. empty) with inline editing ---
+  function renderSections(){
+    md.innerHTML = EVERGREEN_SECTIONS.map(s=>{
+      const v=(concept[s.key]||"");
+      const content = v.trim() ? marked.parse(v)
+        : '<p class="sec-empty" data-add="'+s.key+'">＋ add '+esc(s.label.toLowerCase())+'</p>';
+      return '<section class="concept-sec" data-key="'+s.key+'">'
+        + '<div class="sec-head-row"><h2 class="sec-head">'+s.icon+' '+esc(s.label)+'</h2>'
+        + '<button class="sec-edit" data-edit="'+s.key+'">'+(v.trim()?'edit':'')+'</button></div>'
+        + '<div class="sec-content">'+content+'</div></section>';
+    }).join("");
+    md.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editSection(b.dataset.edit));
+    md.querySelectorAll('[data-add]').forEach(p=>p.onclick=()=>editSection(p.dataset.add));
+  }
+  function editSection(key){
+    const sec=md.querySelector('.concept-sec[data-key="'+key+'"]');
+    const content=sec.querySelector('.sec-content');
+    const cur=concept[key]||"";
+    content.innerHTML='<textarea class="sec-ta">'+esc(cur)+'</textarea>'
+      + '<div class="sec-actions"><button class="btn primary sec-save">Save</button>'
+      + '<button class="btn ghost sec-cancel">Cancel</button></div>';
+    const ta=content.querySelector('.sec-ta'); ta.focus();
+    sec.querySelector('.sec-edit').style.visibility='hidden';
+    content.querySelector('.sec-cancel').onclick=()=>renderSections();
+    content.querySelector('.sec-save').onclick=async()=>{
+      try{ const c2=await EvergreenAPI.withAuth(()=>EvergreenAPI.updateConcept(slug,{[key]:ta.value})); if(!c2) return;
+        concept=c2; renderSections(); }
+      catch(e){ alert(e.message); }
+    };
+  }
+
   if(!slug){ md.innerHTML='<div class="err">No concept specified. <a href="concepts.html">Pick one →</a></div>'; return; }
   EvergreenAPI.getConcept(slug).then(c=>{
     concept=c; document.title=c.title+" — Evergreen"; $("pageTitle").textContent=c.title;
-    renderMeta();
-    let html = EvergreenSections.renderHTML(c, marked);
-    if(!html && (c.body||"").trim()) html = marked.parse(c.body);   // legacy fallback
-    md.innerHTML = html || "*This concept has no content yet — hit edit to write it.*";
+    // one-time: if a legacy body exists and no sections are filled, seed Rundown so it's visible/editable
+    const anySection = EVERGREEN_SECTIONS.some(s => (c[s.key]||"").trim());
+    if(!anySection && (c.body||"").trim()) concept.rundown = c.body;
+    renderMeta(); renderSections();
     $("comments").style.display=""; renderComments();
   }).catch(e=>{ md.innerHTML='<div class="err">'+esc(e.message)+'<br><a href="concepts.html">Back to concepts →</a></div>'; });
 })();
