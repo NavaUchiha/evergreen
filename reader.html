@@ -92,17 +92,61 @@
     try{ const c=await EvergreenAPI.withAuth(()=>EvergreenAPI.addComment(slug,t)); if(!c) return;
       concept.comments=(concept.comments||[]).concat(c); $("commentBody").value=""; renderComments(); }catch(e){ alert(e.message); } };
 
+  // --- embedded interactive visualizations ---
+  // Concept content is authored by Claude Desktop via the MCP tools and may embed
+  // <script> (e.g. D3 from a CDN). We render any script-bearing section inside a
+  // sandboxed iframe: scripts execute natively there, but "allow-scripts" WITHOUT
+  // "allow-same-origin" gives the frame an opaque origin — it cannot read this page's
+  // localStorage password, reach the DOM, or make credentialed API calls.
+  const THEME_CSS = new URL("assets/theme.css", location.href).href;
+  function hasScript(html){ return /<script[\s>]/i.test(html); }
+  function mountViz(sec, html){
+    const doc =
+      '<!doctype html><html><head><meta charset="utf-8">'
+      + '<link rel="stylesheet" href="' + THEME_CSS + '">'
+      + '<style>html,body{margin:0;padding:0;background:transparent}'
+      + 'body{color:#D6E0EA;font-family:var(--sans,system-ui,sans-serif)}'
+      + '.md{padding:0}svg{max-width:100%;height:auto}</style></head>'
+      + '<body class="md">' + html
+      // report our height so the parent can size the (unmeasurable) cross-origin frame
+      + '<script>(function(){function ph(){try{parent.postMessage({__evg_h:document.documentElement.scrollHeight},"*")}catch(e){}}'
+      + 'if(window.ResizeObserver){new ResizeObserver(ph).observe(document.body)}'
+      + 'window.addEventListener("load",ph);[100,400,1200].forEach(function(t){setTimeout(ph,t)})})();<\/script>'
+      + '</body></html>';
+    const f = document.createElement("iframe");
+    f.className = "viz-frame";
+    f.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
+    f.setAttribute("scrolling", "no");
+    f.setAttribute("title", "interactive visualization");
+    f.style.cssText = "width:100%;border:0;display:block;height:140px";
+    f.srcdoc = doc;
+    sec.querySelector(".sec-content").appendChild(f);
+  }
+  // a sandboxed viz frame reports its height here → size it to fit (no inner scrollbar)
+  window.addEventListener("message", (e)=>{
+    const d = e.data; if(!d || typeof d.__evg_h !== "number") return;
+    md.querySelectorAll("iframe.viz-frame").forEach(f=>{ if(f.contentWindow===e.source) f.style.height=(d.__evg_h+8)+"px"; });
+  });
+
   // --- render every section (incl. empty) with inline editing ---
   function renderSections(){
+    const vizJobs = [];
     md.innerHTML = EVERGREEN_SECTIONS.map(s=>{
       const v=(concept[s.key]||"");
-      const content = v.trim() ? marked.parse(v)
-        : '<p class="sec-empty" data-add="'+s.key+'">＋ add '+esc(s.label.toLowerCase())+'</p>';
+      let content;
+      if(!v.trim()){
+        content = '<p class="sec-empty" data-add="'+s.key+'">＋ add '+esc(s.label.toLowerCase())+'</p>';
+      } else {
+        const html = marked.parse(v);
+        if(hasScript(html)){ vizJobs.push({ key:s.key, html }); content=""; }  // → sandboxed iframe below
+        else content = html;
+      }
       return '<section class="concept-sec" data-key="'+s.key+'">'
         + '<div class="sec-head-row"><h2 class="sec-head">'+s.icon+' '+esc(s.label)+'</h2>'
         + '<button class="sec-edit" data-edit="'+s.key+'">'+(v.trim()?'edit':'')+'</button></div>'
         + '<div class="sec-content">'+content+'</div></section>';
     }).join("");
+    for(const j of vizJobs) mountViz(md.querySelector('.concept-sec[data-key="'+j.key+'"]'), j.html);
     md.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editSection(b.dataset.edit));
     md.querySelectorAll('[data-add]').forEach(p=>p.onclick=()=>editSection(p.dataset.add));
   }
